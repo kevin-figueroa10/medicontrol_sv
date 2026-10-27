@@ -1,0 +1,23 @@
+import {createContext,useContext,useEffect,useState,useCallback,useRef} from 'react';
+import {api} from '../lib/api';
+export type Row={id:number;[key:string]:any};
+export type Session={id:number;nombre:string;correo:string;rol:string};
+type Panel={documents:Row[];patients:Row[];appointments:Row[];doctors:Row[];services:Row[];specialties:Row[];consultations:Row[];prescriptions:Row[];studies:Row[];followups:Row[];payments:Row[];users:Row[];logs:Row[];clinic:Row|null};
+const empty:Panel={documents:[],patients:[],appointments:[],doctors:[],services:[],specialties:[],consultations:[],prescriptions:[],studies:[],followups:[],payments:[],users:[],logs:[],clinic:null};
+type Context={panel:Panel;session:Session;loading:boolean;busy:boolean;reload:()=>Promise<void>;mutate:(path:string,body?:unknown,method?:string)=>Promise<any>};
+const ClinicContext=createContext<Context|null>(null);
+export function ClinicProvider({session,children}:{session:Session;children:React.ReactNode}){
+ const [panel,setPanel]=useState(empty),[loading,setLoading]=useState(true),[ready,setReady]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState(''),[message,setMessage]=useState('');const lock=useRef(false);
+ const reload=useCallback(async()=>{try{const p=await api<Panel>('/panel');setPanel(p);setReady(true);setError('');}catch(ex){setError(ex instanceof Error?ex.message:'No se pudo cargar la información.');throw ex;}finally{setLoading(false);}},[]);
+ useEffect(()=>{reload().catch(()=>{});},[reload]);
+ async function mutate(path:string,body?:unknown,method='POST'){if(lock.current)throw new Error('Hay una operación en curso.');lock.current=true;setBusy(true);setError('');setMessage('');try{const r=await api(path,{method,...(body!==undefined?{body:JSON.stringify(body)}:{})});setMessage('Cambios guardados correctamente.');try{await reload();}catch{setMessage('Guardado. No se pudo actualizar la vista; vuelva a cargar los datos.');}return r;}catch(ex){setError(ex instanceof Error?ex.message:'No se pudo guardar.');throw ex;}finally{lock.current=false;setBusy(false);}}
+ return <ClinicContext.Provider value={{panel,session,loading,busy,reload,mutate}}>{error&&<div className="sticky top-0 z-30 p-4 bg-red-50 border-b border-red-200 text-red-800 text-sm" role="alert">{error} <button className="underline ml-3" onClick={()=>reload().catch(()=>{})}>Reintentar</button></div>}{message&&<div className="px-6 py-3 bg-emerald-50 text-emerald-800 text-sm flex justify-between" role="status">{message}<button aria-label="Cerrar mensaje" onClick={()=>setMessage('')}>×</button></div>}{loading?<div className="p-12 text-center text-slate-500">Cargando información…</div>:ready?children:<div className="p-8 text-slate-500 text-sm">La información no está disponible. Use Reintentar para volver a cargar.</div>}{busy&&<div className="fixed inset-0 bg-white/40 z-[100] grid place-items-center" aria-live="polite"><div className="card p-5">Guardando…</div></div>}</ClinicContext.Provider>;
+}
+export function useClinic(){const ctx=useContext(ClinicContext);if(!ctx)throw new Error('Falta la sesión clínica.');return ctx;}
+export function date(value:unknown,withTime=false){if(!value)return '—';const d=new Date(String(value).length===10?String(value)+'T12:00:00':String(value));return Number.isNaN(d.valueOf())?'—':withTime?d.toLocaleString('es-SV'):d.toLocaleDateString('es-SV');}
+export function day(value?:unknown){const d=value?new Date(String(value)):new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
+export function age(value:string){const birth=new Date(value+'T12:00:00'),now=new Date();return now.getFullYear()-birth.getFullYear()-(now.getMonth()<birth.getMonth()||(now.getMonth()===birth.getMonth()&&now.getDate()<birth.getDate())?1:0);}
+export function initials(name:string){return name.split(' ').filter(Boolean).map(n=>n[0]).slice(0,2).join('').toUpperCase();}
+export function download(name:string,text:string,type='text/plain;charset=utf-8'){const url=URL.createObjectURL(new Blob([text],{type}));const a=document.createElement('a');a.href=url;a.download=name;a.click();URL.revokeObjectURL(url);}
+export function money(value:unknown){return Number(value||0).toLocaleString('es-SV',{style:'currency',currency:'USD'});}
+export function allowedStates(current:string,role:string){if(role==='Medico')return current==='En espera'?['En consulta']:current==='En consulta'?['Finalizada']:[];if(role==='Paciente')return ['Confirmada','En espera'].includes(current)?['Cancelada']:[];return current==='Confirmada'?['En espera','Cancelada','No asistió']:current==='En espera'?['Cancelada','No asistió']:[];}

@@ -1,0 +1,45 @@
+using System.Security.Claims;
+using MediControlSV.Api.Data;
+using MediControlSV.Api.Infrastructure;
+using MediControlSV.Api.Models;
+using Microsoft.EntityFrameworkCore;
+namespace MediControlSV.Api.Endpoints;
+public static class ClinicalEndpoints {
+ public sealed record ConsultationInput(int CitaId,string Motivo,string Diagnostico,string? Antecedentes,string? Evaluacion,string? Tratamiento,string? Recomendaciones,string? Observaciones,MediControlSV.Api.Contracts.SignosRequest? Signos=null);
+ public sealed record PrescriptionInput(int ConsultaId,string? Indicaciones,List<MedicationInput> Medicamentos);
+ public sealed record MedicationInput(string Medicamento,string Dosis,string Frecuencia,string Duracion,string? Presentacion,string? Indicaciones);
+ public sealed record PaymentInput(int CitaId,decimal Monto,string Metodo,string? Referencia);
+ public sealed record StudyInput(int ConsultaId,string Tipo,string? Indicaciones);
+ public sealed record FollowUpInput(int ConsultaId,DateOnly Fecha,string Motivo,string? Indicaciones);
+ public static void MapClinical(this RouteGroupBuilder api){
+  api.MapGet("/consultas/{id:int}",async(int id,AppDbContext db,ClaimsPrincipal user)=>{
+   var q=db.Consultas.AsNoTracking().Where(x=>x.Id==id);var uid=Helpers.UserId(user);var role=Helpers.Role(user);
+   if(role=="Paciente")q=q.Where(x=>x.Cita!.Paciente!.UsuarioId==uid);if(role=="Medico")q=q.Where(x=>x.Cita!.Medico!.UsuarioId==uid);
+   var result=await q.Select(x=>new{x.Id,x.CitaId,x.Motivo,x.Diagnostico,x.Tratamiento,x.Recomendaciones,x.Estado,x.FechaUtc}).FirstOrDefaultAsync();return result==null?Results.NotFound():Results.Ok(result);
+  }).RequireAuthorization(p=>p.RequireRole("Administrador","Medico","Paciente"));
+  api.MapPost("/consultas",async(ConsultationInput v,AppDbContext db,ClaimsPrincipal user)=>{
+   if(v.CitaId<=0||string.IsNullOrWhiteSpace(v.Motivo)||string.IsNullOrWhiteSpace(v.Diagnostico)||new[]{v.Motivo,v.Diagnostico,v.Antecedentes??"",v.Evaluacion??"",v.Tratamiento??"",v.Recomendaciones??"",v.Observaciones??""}.Any(x=>x.Length>2000))return Helpers.Bad("Datos de consulta inválidos.");
+   if(v.Signos is {} vital&&vital.PresionSistolica.HasValue&&vital.PresionDiastolica.HasValue&&vital.PresionSistolica<=vital.PresionDiastolica)return Helpers.Bad("La presión sistólica debe superar la diastólica.");
+   var uid=Helpers.UserId(user);var cita=await db.Citas.Include(x=>x.Medico).FirstOrDefaultAsync(x=>x.Id==v.CitaId);if(cita==null)return Results.NotFound();if(cita.Medico?.UsuarioId!=uid||cita.Estado!="En consulta")return Results.Forbid();if(await db.Consultas.AnyAsync(x=>x.CitaId==v.CitaId))return Results.Conflict(new{error="La consulta ya existe."});
+   await using var tx=await db.Database.BeginTransactionAsync();var c=new Consulta{CitaId=v.CitaId,Motivo=v.Motivo.Trim(),Diagnostico=v.Diagnostico.Trim(),Antecedentes=v.Antecedentes??"",Evaluacion=v.Evaluacion??"",Tratamiento=v.Tratamiento??"",Recomendaciones=v.Recomendaciones??"",Observaciones=v.Observaciones??""};db.Consultas.Add(c);await db.SaveChangesAsync();if(v.Signos is {} s){db.SignosVitales.Add(new SignosVitales{ConsultaId=c.Id,Temperatura=s.Temperatura,FrecuenciaCardiaca=s.FrecuenciaCardiaca,PresionSistolica=s.PresionSistolica,PresionDiastolica=s.PresionDiastolica,Saturacion=s.Saturacion,PesoKg=s.PesoKg,AlturaCm=s.AlturaCm});}db.Auditorias.Add(new Auditoria{UsuarioId=uid,Accion="CREAR",Entidad="Consulta",EntidadId=c.Id});await db.SaveChangesAsync();await tx.CommitAsync();return Results.Created($"/api/consultas/{c.Id}",new{c.Id});
+  }).RequireAuthorization(p=>p.RequireRole("Medico"));
+  api.MapPost("/recetas",async(PrescriptionInput v,AppDbContext db,ClaimsPrincipal user)=>{
+   if(v.ConsultaId<=0||(v.Indicaciones??"").Length>1000||v.Medicamentos==null||v.Medicamentos.Count is <1 or >20||v.Medicamentos.Any(x=>x==null||(x.Presentacion??"").Length>100||(x.Indicaciones??"").Length>500||string.IsNullOrWhiteSpace(x.Medicamento)||string.IsNullOrWhiteSpace(x.Dosis)||string.IsNullOrWhiteSpace(x.Frecuencia)||string.IsNullOrWhiteSpace(x.Duracion)||x.Medicamento.Length>160||x.Dosis.Length>100||x.Frecuencia.Length>100||x.Duracion.Length>100))return Helpers.Bad("Detalle de receta inválido.");
+   var uid=Helpers.UserId(user);var c=await db.Consultas.Include(x=>x.Cita).ThenInclude(x=>x!.Medico).FirstOrDefaultAsync(x=>x.Id==v.ConsultaId);if(c==null)return Results.NotFound();if(c.Cita==null||c.Cita.Medico==null||c.Cita.Medico.UsuarioId!=uid)return Results.Forbid();await using var tx=await db.Database.BeginTransactionAsync();var r=new Receta{ConsultaId=c.Id,MedicoId=c.Cita.MedicoId,Indicaciones=v.Indicaciones??""};db.Recetas.Add(r);await db.SaveChangesAsync();db.DetallesReceta.AddRange(v.Medicamentos.Select(x=>new DetalleReceta{RecetaId=r.Id,Medicamento=x.Medicamento.Trim(),Dosis=x.Dosis.Trim(),Frecuencia=x.Frecuencia.Trim(),Duracion=x.Duracion.Trim(),Presentacion=x.Presentacion??"",Indicaciones=x.Indicaciones??""}));await db.SaveChangesAsync();await tx.CommitAsync();return Results.Created($"/api/recetas/{r.Id}",new{r.Id});
+  }).RequireAuthorization(p=>p.RequireRole("Medico"));
+  api.MapGet("/recetas/{id:int}",async(int id,AppDbContext db,ClaimsPrincipal user)=>{
+   var q=db.Recetas.AsNoTracking().Where(x=>x.Id==id);var uid=Helpers.UserId(user);if(Helpers.Role(user)=="Paciente")q=q.Where(x=>x.Consulta!.Cita!.Paciente!.UsuarioId==uid);if(Helpers.Role(user)=="Medico")q=q.Where(x=>x.Medico!.UsuarioId==uid);var r=await q.Select(x=>new{x.Id,x.FechaUtc,x.Anulada,x.Indicaciones,Medicamentos=db.DetallesReceta.Where(d=>d.RecetaId==x.Id).Select(d=>new{d.Medicamento,d.Dosis,d.Frecuencia,d.Duracion,d.Presentacion,d.Indicaciones}).ToList()}).FirstOrDefaultAsync();return r==null?Results.NotFound():Results.Ok(r);
+  }).RequireAuthorization(p=>p.RequireRole("Administrador","Medico","Paciente"));
+  api.MapPost("/pagos",async(PaymentInput v,AppDbContext db,ClaimsPrincipal user)=>{
+   if(decimal.Round(v.Monto,2)!=v.Monto||v.Monto<=0||v.Monto>100000||!new[]{"Efectivo","Tarjeta","Transferencia"}.Contains(v.Metodo)||(v.Referencia??"").Length>100)return Helpers.Bad("Pago inválido.");if(v.Metodo!="Efectivo"&&string.IsNullOrWhiteSpace(v.Referencia))return Helpers.Bad("Indique la referencia de la operación.");await using var tx=await db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);var cita=await db.Citas.Include(x=>x.Servicio).FirstOrDefaultAsync(x=>x.Id==v.CitaId);if(cita==null)return Results.NotFound();if(cita.Estado is "Cancelada" or "No asistió")return Helpers.Bad("No se puede cobrar una cita cancelada o no asistida.");var pagado=await db.Pagos.Where(x=>x.CitaId==v.CitaId&&x.Estado=="Pagado").SumAsync(x=>(decimal?)x.Monto)??0m;if(pagado+v.Monto>cita.PrecioAcordado)return Results.Conflict(new{error="El pago supera el saldo pendiente del servicio."});var p=new Pago{CitaId=v.CitaId,Monto=v.Monto,Metodo=v.Metodo,Referencia=v.Referencia?.Trim()??""};db.Pagos.Add(p);await db.SaveChangesAsync();db.Auditorias.Add(new Auditoria{UsuarioId=Helpers.UserId(user),Accion="CREAR",Entidad="Pago",EntidadId=p.Id});await db.SaveChangesAsync();await tx.CommitAsync();return Results.Created($"/api/pagos/{p.Id}",new{p.Id});
+  }).RequireAuthorization("Administracion");
+  api.MapGet("/pagos",async(AppDbContext db)=>await db.Pagos.AsNoTracking().OrderByDescending(x=>x.FechaUtc).Take(100).Select(x=>new{x.Id,x.CitaId,x.Monto,x.Metodo,x.Estado,x.Referencia,x.FechaUtc}).ToListAsync()).RequireAuthorization("Administracion");
+  api.MapPost("/estudios",async(StudyInput v,AppDbContext db,ClaimsPrincipal user)=>{
+   if(string.IsNullOrWhiteSpace(v.Tipo)||v.Tipo.Length>140||(v.Indicaciones??"").Length>1000)return Helpers.Bad("Estudio inválido.");var c=await db.Consultas.Where(x=>x.Id==v.ConsultaId&&x.Cita!.Medico!.UsuarioId==Helpers.UserId(user)).FirstOrDefaultAsync();if(c==null)return Results.Forbid();var s=new EstudioMedico{ConsultaId=c.Id,Tipo=v.Tipo.Trim(),Indicaciones=v.Indicaciones??""};db.EstudiosMedicos.Add(s);await db.SaveChangesAsync();return Results.Created($"/api/estudios/{s.Id}",new{s.Id});
+  }).RequireAuthorization(p=>p.RequireRole("Medico"));
+  api.MapPost("/seguimientos",async(FollowUpInput v,AppDbContext db,ClaimsPrincipal user)=>{
+   if(v.Fecha<DateOnly.FromDateTime(DateTime.Today)||string.IsNullOrWhiteSpace(v.Motivo)||v.Motivo.Length>500||(v.Indicaciones??"").Length>1500)return Helpers.Bad("Seguimiento inválido.");var c=await db.Consultas.FirstOrDefaultAsync(x=>x.Id==v.ConsultaId&&x.Cita!.Medico!.UsuarioId==Helpers.UserId(user));if(c==null)return Results.Forbid();var s=new Seguimiento{ConsultaId=c.Id,Fecha=v.Fecha,Motivo=v.Motivo.Trim(),Indicaciones=v.Indicaciones??""};db.Seguimientos.Add(s);await db.SaveChangesAsync();return Results.Created($"/api/seguimientos/{s.Id}",new{s.Id});
+  }).RequireAuthorization(p=>p.RequireRole("Medico"));
+  api.MapGet("/auditoria",async(AppDbContext db,int? page)=>await db.Auditorias.AsNoTracking().OrderByDescending(x=>x.FechaUtc).Skip((Math.Clamp(page??1,1,10000)-1)*50).Take(50).ToListAsync()).RequireAuthorization(p=>p.RequireRole("Administrador"));
+ }
+}

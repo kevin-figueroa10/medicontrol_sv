@@ -1,0 +1,32 @@
+# Local runtime and private documents
+.freebuff/
+**/App_Data/
+.checks/
+.runtime/
+
+# Dependencies and generated builds
+**/node_modules/
+**/dist/
+**/bin/
+**/obj/
+**/.vercel/
+.vs/
+**/*.user
+**/*.suo
+
+# Secrets (templates can be committed)
+**/.env
+**/.env.*
+!**/.env.example
+**/secrets.json
+*.pfx
+*.p12
+*.key
+
+# Database backups and local logs
+*.bak
+*.bacpac
+*.mdf
+*.ldf
+*.dump
+*.log

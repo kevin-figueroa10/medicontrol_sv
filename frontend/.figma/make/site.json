@@ -1,0 +1,12 @@
+{
+  "description": "Gestión de pacientes, citas y atención clínica.",
+  "robots": {
+    "index": false
+  },
+  "accessibility": {
+    "addBypassLinks": false,
+    "ignoreReducedMotion": false
+  },
+  "title": "MediControl SV",
+  "language": "es"
+}

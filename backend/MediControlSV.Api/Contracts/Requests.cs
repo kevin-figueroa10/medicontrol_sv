@@ -1,0 +1,18 @@
+using System.ComponentModel.DataAnnotations;
+namespace MediControlSV.Api.Contracts;
+public sealed record LoginRequest([property:Required,EmailAddress,MaxLength(200)] string Correo,[property:Required] string Password);
+public sealed record UserRequest([property:Required,MaxLength(160)] string Nombre,[property:Required,EmailAddress,MaxLength(200)] string Correo,[property:Required,MinLength(12)] string Password,[property:Required] string Rol,int? VinculoId);
+public sealed record PacienteRequest([property:Required,StringLength(160,MinimumLength=3)] string Nombre,[property:Required,StringLength(30,MinimumLength=5)] string Documento,DateOnly FechaNacimiento,[property:MaxLength(20)] string Telefono,[property:EmailAddress,MaxLength(200)] string? Correo,[property:MaxLength(160)] string? ContactoNombre,[property:MaxLength(20)] string? ContactoTelefono);
+public sealed record MedicoRequest([property:Required,MaxLength(160)] string Nombre,[property:Required,MaxLength(100)] string Especialidad,[property:Required,MaxLength(50)] string Jvpm);
+public sealed record ServicioRequest([property:Required,MaxLength(140)] string Nombre,[property:Range(typeof(decimal),"0","1000000")] decimal Precio);
+public sealed record CitaRequest([property:Range(1,int.MaxValue)] int PacienteId,[property:Range(1,int.MaxValue)] int MedicoId,[property:Range(1,int.MaxValue)] int ServicioId,DateTime Inicio,DateTime Fin,[property:MaxLength(500)] string? Motivo);
+public sealed record ReprogramarRequest(DateTime Inicio,DateTime Fin,[property:Required,MaxLength(200)] string Motivo);
+public sealed record EstadoRequest([property:Required] string Estado);
+public sealed record ConsultaRequest([property:Range(1,int.MaxValue)] int CitaId,[property:Required,MaxLength(2000)] string Diagnostico,[property:MaxLength(2000)] string? Tratamiento,[property:MaxLength(2000)] string? Observaciones,[property:MaxLength(2000)] string? Motivo,[property:MaxLength(2000)] string? Antecedentes,[property:MaxLength(2000)] string? Evaluacion,[property:MaxLength(2000)] string? Recomendaciones);
+public sealed record SignosRequest(int ConsultaId,[property:Range(typeof(decimal),"25","45")] decimal? Temperatura,[property:Range(20,250)] int? FrecuenciaCardiaca,[property:Range(50,250)] int? PresionSistolica,[property:Range(30,180)] int? PresionDiastolica,[property:Range(50,100)] int? Saturacion,[property:Range(typeof(decimal),"1","500")] decimal? PesoKg,[property:Range(typeof(decimal),"30","250")] decimal? AlturaCm);
+public sealed record MedicamentoRequest([property:Required,MaxLength(160)] string Medicamento,[property:Required,MaxLength(100)] string Dosis,[property:Required,MaxLength(100)] string Frecuencia,[property:Required,MaxLength(100)] string Duracion,[property:MaxLength(100)] string? Presentacion,[property:MaxLength(500)] string? Indicaciones);
+public sealed record RecetaRequest(int ConsultaId,[property:MaxLength(1000)] string? Indicaciones,List<MedicamentoRequest> Medicamentos);
+public sealed record EstudioRequest(int ConsultaId,[property:Required,MaxLength(140)] string Tipo,[property:MaxLength(1000)] string? Indicaciones);
+public sealed record ResultadoRequest([property:Required,MaxLength(2500)] string Descripcion);
+public sealed record SeguimientoRequest(int ConsultaId,DateOnly Fecha,[property:Required,MaxLength(500)] string Motivo,[property:MaxLength(1500)] string? Indicaciones);
+public sealed record PagoRequest(int CitaId,[property:Range(typeof(decimal),"0.01","1000000")] decimal Monto,[property:Required] string Metodo,[property:MaxLength(100)] string? Referencia);
