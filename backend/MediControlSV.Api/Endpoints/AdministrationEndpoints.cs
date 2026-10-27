@@ -13,12 +13,23 @@ namespace MediControlSV.Api.Endpoints;
 public static class AdministrationEndpoints {
 
  public sealed record CreateUser(string Nombre,string Correo,string Password,string Rol,int? PacienteId=null);
+ public sealed record AdminPasswordInput(string Nueva,string Confirmacion);
 
  public sealed record CreateDoctor(string Nombre,string Especialidad,string Jvpm,int UsuarioId,string? Telefono=null,string? Horario=null,List<ScheduleInput>? Horarios=null);
 
  public sealed record CreateService(string Nombre,decimal Precio);
 
  public static void MapAdministration(this RouteGroupBuilder api) {
+  api.MapPut("/usuarios/{id:int}/password",async(int id,AdminPasswordInput v,AppDbContext db,ClaimsPrincipal user)=>{
+   if(!Helpers.StrongPassword(v.Nueva))return Helpers.Bad("Use al menos 12 caracteres, mayúscula, minúscula, número y símbolo; máximo 72 bytes.");
+   if(v.Nueva!=v.Confirmacion)return Helpers.Bad("Las contraseñas no coinciden.");
+   var u=await db.Usuarios.FindAsync(id);if(u==null)return Results.NotFound();
+   if(BCrypt.Net.BCrypt.Verify(v.Nueva,u.PasswordHash))return Helpers.Bad("La nueva contraseña debe ser diferente de la actual.");
+   u.PasswordHash=BCrypt.Net.BCrypt.HashPassword(v.Nueva,12);u.IntentosFallidos=0;u.BloqueadoHastaUtc=null;
+   foreach(var token in await db.TokensRecuperacion.Where(x=>x.UsuarioId==id&&x.UsadoUtc==null).ToListAsync())token.UsadoUtc=DateTime.UtcNow;
+   db.Auditorias.Add(new Auditoria{UsuarioId=Helpers.UserId(user),Accion="RESTABLECER_CONTRASEÑA",Entidad="Usuario",EntidadId=id});
+   await db.SaveChangesAsync();return Results.NoContent();
+  }).RequireAuthorization(p=>p.RequireRole("Administrador"));
 
   api.MapGet("/usuarios",async(AppDbContext db)=>await db.Usuarios.AsNoTracking().OrderBy(x=>x.Nombre).Select(x=>new{x.Id,x.Nombre,x.Correo,x.Rol,x.Activo}).ToListAsync()).RequireAuthorization(p=>p.RequireRole("Administrador"));
 

@@ -1,8 +1,8 @@
 import {useClinic,date,Row} from '../../context/Clinic';
-import {UserForm} from '../../components/ManageForms';
+import {UserForm,UserPasswordForm} from '../../components/ManageForms';
 import {Modal} from '../../components/ClinicalUI';
 import { useState } from 'react';
-import { Plus, Edit3, UserX, UserCheck, Shield } from 'lucide-react';
+import { Plus, Edit3, UserX, UserCheck, Shield, KeyRound } from 'lucide-react';
 
 
 const roleBadge: Record<string, string> = {
@@ -16,6 +16,7 @@ export default function Users() {
  const {panel,mutate}=useClinic();const users=panel.users.map(u=>({id:u.id,name:String(u.nombre),email:String(u.correo),role:u.rol==='Medico'?'Médico':String(u.rol),status:u.activo?'Activo':'Inactivo',lastAccess:'—'}));async function toggle(id:number){const u=panel.users.find(u=>u.id===id);if(!u||!window.confirm(u.activo?'¿Desactivar usuario?':'¿Activar usuario?'))return;try{await mutate(`/usuarios/${id}/activo`,{activo:!u.activo},'PATCH');}catch{}};
   const [showModal, setShowModal] = useState(false);
  const [edit,setEdit]=useState<Row|undefined>();
+ const [passwordUser,setPasswordUser]=useState<Row|undefined>();
 
   return (
     <div className="p-6 max-w-screen-xl">
@@ -64,6 +65,7 @@ export default function Users() {
                   <td className="px-5 py-3.5 text-sm text-slate-500">{u.lastAccess}</td>
                   <td className="px-5 py-3.5">
                     <div className="flex gap-1">
+                      <button aria-label={`Cambiar contraseña de ${u.name}`} title="Cambiar contraseña" className="btn btn-ghost btn-sm p-1.5" onClick={()=>setPasswordUser(panel.users.find(x=>x.id===u.id))}><KeyRound size={13} className="text-blue-600" /></button>
                       <button aria-label="Editar usuario" className="btn btn-ghost btn-sm p-1.5" onClick={()=>{setEdit(panel.users.find(x=>x.id===u.id));setShowModal(true);}}><Edit3 size={13} className="text-slate-500" /></button>
                       {u.status === 'Activo'
                         ? <button aria-label="Desactivar usuario" className="btn btn-ghost btn-sm p-1.5" onClick={()=>toggle(u.id)}><UserX size={13} className="text-red-500" /></button>
@@ -78,6 +80,7 @@ export default function Users() {
       </div>
 
       {showModal&&<Modal title="Usuario" onClose={()=>setShowModal(false)}><UserForm edit={edit} onClose={()=>setShowModal(false)}/></Modal>}
+      {passwordUser&&<Modal title="Cambiar contraseña" onClose={()=>setPasswordUser(undefined)}><UserPasswordForm user={passwordUser} onClose={()=>setPasswordUser(undefined)}/></Modal>}
     </div>
   );
 }
