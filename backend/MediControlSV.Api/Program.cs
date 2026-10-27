@@ -27,7 +27,12 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJw
     }};
 });
 builder.Services.AddAuthorization(o => o.AddPolicy("Administracion", p => p.RequireRole("Administrador","Recepcionista")));
-builder.Services.AddCors(o => o.AddPolicy("Frontend", p => p.WithOrigins("http://localhost:5173", "http://127.0.0.1:5173").AllowAnyHeader().AllowAnyMethod()));
+var frontendOrigins = (builder.Configuration["Cors:AllowedOrigins"] ?? "")
+    .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+    .Select(origin => origin.TrimEnd('/'))
+    .Concat(new[] { "http://localhost:5173", "http://127.0.0.1:5173" })
+    .Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+builder.Services.AddCors(o => o.AddPolicy("Frontend", p => p.WithOrigins(frontendOrigins).AllowAnyHeader().AllowAnyMethod()));
 builder.Services.AddRateLimiter(options => {
     options.RejectionStatusCode=429;
     options.AddPolicy("login", context => RateLimitPartition.GetFixedWindowLimiter(context.Connection.RemoteIpAddress?.ToString()??"unknown", _=>new FixedWindowRateLimiterOptions{PermitLimit=10,Window=TimeSpan.FromMinutes(1),QueueLimit=0}));

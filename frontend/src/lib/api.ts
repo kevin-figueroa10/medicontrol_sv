@@ -8,7 +8,7 @@ export async function api<T>(path:string,options:RequestInit={}):Promise<T>{
  if(options.body&&!(options.body instanceof FormData))headers.set('Content-Type','application/json');
  if(token)headers.set('Authorization',`Bearer ${token}`);
  let response:Response;
- try {response=await fetch(`${BASE}/api${path}`,{...options,headers,signal:options.signal??AbortSignal.timeout(20000)});}
+ try {response=await fetch(`${BASE}/api${path}`,{...options,headers,signal:options.signal??AbortSignal.timeout(90000)});}
  catch {throw new ApiError(0,'No se pudo conectar con el servidor. Compruebe la conexión y vuelva a intentar.');}
  if(!response.ok){
   const content=await response.text();let detail='';
