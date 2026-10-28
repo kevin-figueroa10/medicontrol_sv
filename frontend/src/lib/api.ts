@@ -1,4 +1,5 @@
-const BASE = (import.meta.env.VITE_API_URL || 'http://localhost:5080').replace(/\/$/, '');
+// Vercel forwards /api to Render so browsers use one HTTPS origin in production.
+const BASE = (import.meta.env.PROD ? '' : (import.meta.env.VITE_API_URL || 'http://localhost:5080')).replace(/\/$/, '');
 export class ApiError extends Error {
   constructor(public status:number,message:string){super(message);this.name='ApiError';}
 }
