@@ -1,9 +1,13 @@
-import {useClinic,date,Row} from '../../context/Clinic';
+import {useClinic,date,money,Row} from '../../context/Clinic';
+import {useEffect} from 'react';
+import {paymentSummary} from '../../lib/paymentBalances';
 import { useNavigate } from 'react-router-dom';
 import { Calendar, FileText, FlaskConical, Activity, ChevronRight, Clock, MapPin, User } from 'lucide-react';
 
 export default function PatientPortal() {
-  const navigate = useNavigate();const {panel,session}=useClinic();const appointments=panel.appointments.filter(a=>new Date(a.inicio)>new Date()&&!['Cancelada','No asistió'].includes(a.estado));const next=appointments[0];const recipes=panel.prescriptions.filter(r=>!r.anulada);
+  const navigate = useNavigate();const {panel,session,reload}=useClinic();const appointments=panel.appointments.filter(a=>new Date(a.inicio)>new Date()&&!['Cancelada','No asistió','Finalizada'].includes(a.estado));const next=appointments[0];const recipes=panel.prescriptions.filter(r=>!r.anulada);
+  useEffect(()=>{reload().catch(()=>{});},[reload]);
+  const completed=panel.appointments.filter(a=>a.estado==='Finalizada').sort((a,b)=>new Date(b.inicio).valueOf()-new Date(a.inicio).valueOf());
 
 
   return (
@@ -65,6 +69,10 @@ export default function PatientPortal() {
         ))}
       </div>
 
+      {completed.length>0&&<section className="card p-5 mb-6"><h2 className="font-semibold text-slate-900 text-sm mb-3">Mis consultas finalizadas y pagos</h2><div className="max-h-80 overflow-y-auto space-y-3">{completed.map(a=>{
+       const payment=paymentSummary(a.precio,a.pagado);
+       return <div key={a.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-slate-50 p-3"><div><p className="text-sm font-medium">{a.servicio} · {a.medico}</p><p className="text-xs text-slate-500">{date(a.inicio)} · Finalizada</p>{payment&&<p className={`text-xs mt-1 ${payment.saldo>0?'text-amber-800':'text-green-700'}`}><strong>{payment.estado}</strong> · Saldo pendiente: {money(payment.saldo)}</p>}</div><button className="btn btn-secondary btn-sm" onClick={()=>navigate(`/patient/appointments?cita=${a.id}`)}>Ver resumen</button></div>;
+      })}</div></section>}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         {/* My appointments */}
         <div className="card p-5">

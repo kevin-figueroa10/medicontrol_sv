@@ -1,6 +1,9 @@
 import {RescheduleModal} from '../../components/UnattendedAppointments';
-import {useClinic} from '../../context/Clinic';
-import { useState } from 'react';
+import PatientAppointmentSummary from '../../components/PatientAppointmentSummary';
+import {useClinic,money} from '../../context/Clinic';
+import {paymentSummary} from '../../lib/paymentBalances';
+import {appointmentStatus} from '../../lib/appointmentStatus';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Calendar, Clock, User, X, RefreshCw, Check, CheckCircle, ChevronRight } from 'lucide-react';
 
@@ -11,16 +14,21 @@ const statusBadge: Record<string, string> = {
   'Finalizada': 'bg-green-100 text-green-700',
   'Cancelada': 'bg-red-100 text-red-700',
   'No asistió': 'bg-orange-100 text-orange-700',
+  'No atendida': 'bg-orange-100 text-orange-700',
+  'En espera': 'bg-amber-100 text-amber-700',
+  'En consulta': 'bg-purple-100 text-purple-700',
 };
 
 
 
 export default function PatientAppointments() {
   const navigate = useNavigate();
-  const {panel,mutate,busy}=useClinic();const [error,setError]=useState('');
-  const appts=panel.appointments.map(a=>({id:a.id,doctor:String(a.medico),specialty:String(a.especialidad),date:new Date(a.inicio).toLocaleDateString('es-SV',{day:'2-digit',month:'short',year:'numeric'}),time:new Date(a.inicio).toLocaleTimeString('es-SV',{hour:'2-digit',minute:'2-digit'}),status:String(a.estado),group:a.estado==='Cancelada'?'cancelled':new Date(a.inicio)>new Date()&&!['Finalizada','No asistió'].includes(a.estado)?'upcoming':'past'}));
+  const {panel,mutate,busy,reload}=useClinic();const [error,setError]=useState('');
+  useEffect(()=>{reload().catch(()=>{});},[reload]);
+  const appts=panel.appointments.map(a=>({id:a.id,doctor:String(a.medico),specialty:String(a.especialidad),date:new Date(a.inicio).toLocaleDateString('es-SV',{day:'2-digit',month:'short',year:'numeric'}),time:new Date(a.inicio).toLocaleTimeString('es-SV',{hour:'2-digit',minute:'2-digit'}),status:appointmentStatus({estado:a.estado,inicio:a.inicio}),payment:a.estado==='Finalizada'?paymentSummary(a.precio,a.pagado):null,group:a.estado==='Cancelada'?'cancelled':new Date(a.inicio)>new Date()&&!['Finalizada','No asistió'].includes(a.estado)?'upcoming':'past'}));
+  const [summaryId,setSummaryId]=useState<number|null>(()=>Number(new URLSearchParams(window.location.search).get('cita'))||null);
 
-  const [tab, setTab] = useState<'upcoming' | 'past' | 'cancelled'>('upcoming');
+  const [tab, setTab] = useState<'upcoming' | 'past' | 'cancelled'>(summaryId?'past':'upcoming');
   const [cancelId, setCancelId] = useState<number | null>(null);
   const [cancelDone, setCancelDone] = useState(false);
   const [rescheduleId, setRescheduleId] = useState<number | null>(null);
@@ -37,10 +45,10 @@ export default function PatientAppointments() {
     <div className="p-6 max-w-screen-md">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-xl font-bold text-slate-900" style={{ fontFamily: 'DM Sans, sans-serif' }}>Mis citas</h1>
-        <button className="btn btn-primary btn-sm" onClick={() => navigate('/patient/book')}>
+        <div className="flex gap-2"><button className="btn btn-secondary btn-sm" onClick={()=>reload().catch(()=>{})}>Actualizar</button><button className="btn btn-primary btn-sm" onClick={() => navigate('/patient/book')}>
           <Calendar size={13} />
           Agendar cita
-        </button>
+        </button></div>
       </div>
 
       <div className="flex gap-1 mb-5">
@@ -69,7 +77,7 @@ export default function PatientAppointments() {
         <div className="space-y-3">
           {filtered.map(a => (
             <div key={a.id} className="card p-4">
-              <div className="flex items-start gap-4">
+              <div className="flex flex-wrap sm:flex-nowrap items-start gap-4">
                 <div className="w-12 h-12 rounded-xl bg-blue-600 text-white flex flex-col items-center justify-center flex-shrink-0">
                   <div className="text-xs font-medium leading-none">{a.date.split(' ')[1]}</div>
                   <div className="text-base font-bold leading-none mt-0.5" style={{ fontFamily: 'DM Sans, sans-serif' }}>{a.date.split(' ')[0]}</div>
@@ -78,12 +86,14 @@ export default function PatientAppointments() {
                   <div className="flex items-center gap-2 mb-1 flex-wrap">
                     <span className="text-sm font-semibold text-slate-900">{a.doctor}</span>
                     <span className={`badge text-xs ${statusBadge[a.status]}`}>{a.status}</span>
+                    {a.payment&&<span className={`badge text-xs ${a.payment.saldo>0?'bg-amber-100 text-amber-800':'bg-green-100 text-green-700'}`}>{a.payment.estado}</span>}
                   </div>
                   <div className="flex flex-wrap gap-3 text-xs text-slate-500">
                     <span className="flex items-center gap-1"><User size={11} /> {a.specialty}</span>
                     <span className="flex items-center gap-1"><Clock size={11} /> {a.time}</span>
                     <span className="flex items-center gap-1"><Calendar size={11} /> {a.date}</span>
                   </div>
+                  {a.payment&&<p className="text-xs text-slate-600 mt-2">Total: {money(a.payment.total)} · Pagado: {money(a.payment.pagado)} · Saldo: {money(a.payment.saldo)}</p>}
                 </div>
                 {a.group === 'upcoming' && (
                   <div className="flex gap-2 flex-shrink-0">
@@ -95,11 +105,9 @@ export default function PatientAppointments() {
                     </button>
                   </div>
                 )}
-                {a.group === 'past' && (
-                  <button className="btn btn-ghost btn-sm text-blue-600 text-xs flex-shrink-0">
-                    Ver resumen <ChevronRight size={11} />
-                  </button>
-                )}
+                <button className="btn btn-ghost btn-sm text-blue-600 text-xs flex-shrink-0" onClick={()=>setSummaryId(a.id)}>
+                  {a.group==='past'?'Ver resumen':'Ver detalles'} <ChevronRight size={11} />
+                </button>
               </div>
             </div>
           ))}
@@ -137,6 +145,7 @@ export default function PatientAppointments() {
       )}
 
       {current&&<RescheduleModal appointment={current} onClose={closeReschedule}/>}
+      {summaryId!==null&&<PatientAppointmentSummary appointmentId={summaryId} onClose={()=>setSummaryId(null)}/>}
     </div>
   );
 }
