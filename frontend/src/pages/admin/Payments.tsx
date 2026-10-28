@@ -1,7 +1,8 @@
-import {useClinic,date,Row} from '../../context/Clinic';
+import {useClinic,date,day} from '../../context/Clinic';
+import {attendedBalances} from '../../lib/paymentBalances';
 import {PaymentForm} from '../../components/ManageForms';
 import {Modal} from '../../components/ClinicalUI';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Plus, Search, CreditCard, Banknote, Building2 } from 'lucide-react';
 
 
@@ -18,11 +19,14 @@ const statusBadge: Record<string, string> = {
 };
 
 export default function Payments() {
- const {panel}=useClinic();const payments=panel.payments.map(p=>({id:`PAG-${String(p.id).padStart(3,'0')}`,patient:String(p.paciente),service:String(p.servicio),doctor:String(p.medico),date:date(p.fechaUtc),amount:Number(p.monto),method:String(p.metodo),status:String(p.estado)}));
+ const {panel,reload}=useClinic();
+ useEffect(()=>{reload().catch(()=>{});},[reload]);
+ const outstanding=attendedBalances(panel.appointments);
+ const payments=[...outstanding.map(a=>({id:`CITA-${a.id}`,citaId:a.id,patient:String(a.paciente),service:String(a.servicio),doctor:String(a.medico),date:date(a.inicio),amount:a.saldo,method:'Por definir',status:'Pendiente'})),...panel.payments.map(p=>({id:`PAG-${String(p.id).padStart(3,'0')}`,citaId:Number(p.citaId),patient:String(p.paciente),service:String(p.servicio),doctor:String(p.medico),date:date(p.fechaUtc),amount:Number(p.monto),method:String(p.metodo),status:String(p.estado)}))];
   const [search, setSearch] = useState('');
   const [statusF, setStatusF] = useState('Todos');
   const [showModal, setShowModal] = useState(false);
- const [edit,setEdit]=useState<Row|undefined>();
+ const [selectedAppointment,setSelectedAppointment]=useState<number|undefined>();
 
   const filtered = payments.filter(p => {
     const q = search.toLowerCase();
@@ -31,8 +35,8 @@ export default function Payments() {
     return ms && mf;
   });
 
-  const total = filtered.reduce((s, p) => p.status === 'Pagado' ? s + p.amount : s, 0);
-  const pending=panel.appointments.filter(a=>!['Cancelada','No asistió'].includes(a.estado)).reduce((sum,a)=>sum+Math.max(0,Number(a.precio)-Number(a.pagado)),0);
+  const total = panel.payments.filter(p=>p.estado==='Pagado'&&day(p.fechaUtc)===day()).reduce((s,p)=>s+Number(p.monto),0);
+  const pending=outstanding.reduce((sum,a)=>sum+a.saldo,0);
 
   return (
     <div className="p-6 max-w-screen-xl">
@@ -41,10 +45,10 @@ export default function Payments() {
           <h1 className="text-xl font-bold text-slate-900" style={{ fontFamily: 'DM Sans, sans-serif' }}>Pagos</h1>
           <p className="text-sm text-slate-500">Registro de cobros del consultorio</p>
         </div>
-        <button className="btn btn-primary btn-sm" onClick={() => setShowModal(true)}>
+        <div className="flex gap-2"><button className="btn btn-secondary btn-sm" onClick={()=>reload().catch(()=>{})}>Actualizar</button><button className="btn btn-primary btn-sm" onClick={() => {setSelectedAppointment(undefined);setShowModal(true);}}>
           <Plus size={14} />
           Registrar pago
-        </button>
+        </button></div>
       </div>
 
       {/* Summary */}
@@ -86,6 +90,7 @@ export default function Payments() {
               </tr>
             </thead>
             <tbody>
+              {!filtered.length&&<tr><td colSpan={9} className="p-8 text-center text-sm text-slate-500">{statusF==='Pendiente'?'No hay citas atendidas con saldo pendiente.':'No hay registros para este filtro.'}</td></tr>}
               {filtered.map(p => (
                 <tr key={p.id} className="table-row border-b border-slate-50 last:border-0">
                   <td className="px-4 py-3.5 text-xs font-mono text-slate-400">{p.id}</td>
@@ -104,7 +109,7 @@ export default function Payments() {
                     <span className={`badge ${statusBadge[p.status]}`}>{p.status}</span>
                   </td>
                   <td className="px-4 py-3.5">
-                    <button className="btn btn-ghost btn-sm text-blue-600 text-xs">Ver</button>
+                    {p.status==='Pendiente'&&<button className="btn btn-ghost btn-sm text-blue-600 text-xs" onClick={()=>{setSelectedAppointment(p.citaId);setShowModal(true);}}>Cobrar</button>}
                   </td>
                 </tr>
               ))}
@@ -114,7 +119,7 @@ export default function Payments() {
       </div>
 
       {/* Modal */}
-      {showModal&&<Modal title="Registrar pago" onClose={()=>setShowModal(false)}><PaymentForm  onClose={()=>setShowModal(false)}/></Modal>}
+      {showModal&&<Modal title="Registrar pago" onClose={()=>setShowModal(false)}><PaymentForm citaId={selectedAppointment} onClose={()=>setShowModal(false)}/></Modal>}
     </div>
   );
 }

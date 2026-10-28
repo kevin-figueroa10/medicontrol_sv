@@ -30,8 +30,8 @@ export function UserPasswordForm({user,onClose}:{user:Row;onClose:()=>void}){
  <Field label="Confirmar contraseña"><input className="input-field" type="password" autoComplete="new-password" required minLength={12} maxLength={72} value={confirmacion} onChange={e=>setConfirmacion(e.target.value)}/></Field>
  </ActionForm>;
 }
-export function PaymentForm({onClose}:{onClose:()=>void}){
- const {panel,mutate}=useClinic();const [form,setForm]=useState({citaId:'',monto:'',metodo:'Efectivo',referencia:''});const cita=panel.appointments.find(a=>a.id===Number(form.citaId));
+export function PaymentForm({onClose,citaId}:{onClose:()=>void;citaId?:number}){
+ const {panel,mutate}=useClinic();const selected=panel.appointments.find(a=>a.id===citaId);const [form,setForm]=useState({citaId:selected?String(selected.id):'',monto:selected?(Math.round(Number(selected.precio)*100-Number(selected.pagado)*100)/100).toFixed(2):'',metodo:'Efectivo',referencia:''});const cita=panel.appointments.find(a=>a.id===Number(form.citaId));
  return <ActionForm onClose={onClose} label="Registrar pago" onSave={async()=>{await mutate('/pagos',{...form,citaId:Number(form.citaId),monto:Number(form.monto)});}}>
  <Field label="Paciente / cita"><select required className="input-field" value={form.citaId} onChange={e=>{const a=panel.appointments.find(a=>a.id===Number(e.target.value));setForm(p=>({...p,citaId:e.target.value,monto:a?String(Number(a.precio)-Number(a.pagado)):''}));}}><option value="">Seleccionar cita…</option>{panel.appointments.filter(a=>!['Cancelada','No asistió'].includes(a.estado)&&Number(a.precio)>Number(a.pagado)).map(a=><option key={a.id} value={a.id}>#{a.id} · {a.paciente} · {a.servicio} · {money(Number(a.precio)-Number(a.pagado))}</option>)}</select></Field>
  {cita&&<p className="text-sm text-blue-700">Saldo pendiente: {money(Number(cita.precio)-Number(cita.pagado))}</p>}
