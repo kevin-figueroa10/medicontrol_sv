@@ -41,6 +41,10 @@ public static class PortalEndpoints {
   api.MapGet("/panel",async(AppDbContext db,ClaimsPrincipal user)=>{
 
    var uid=Helpers.UserId(user);var role=Helpers.Role(user);var admin=role=="Administrador";var staff=admin||role=="Recepcionista";var clinical=admin||role=="Medico"||role=="Paciente";
+   if(role=="Laboratorio"){
+    var orders=await db.EstudiosMedicos.AsNoTracking().OrderByDescending(x=>x.Id).Select(x=>new{x.Id,x.ConsultaId,Paciente=x.Consulta!.Cita!.Paciente!.Nombre,Medico=x.Consulta.Cita.Medico!.Nombre,x.Tipo,x.Indicaciones,x.Estado,FechaUtc=x.Consulta.FechaUtc,Resultado=db.ResultadosEstudio.Where(r=>r.EstudioMedicoId==x.Id).Select(r=>new{r.Id,r.Descripcion,r.Interpretacion,r.Revisado,r.FechaUtc}).FirstOrDefault(),Archivos=db.DocumentosPaciente.Where(d=>d.EstudioMedicoId==x.Id).Select(d=>new{d.Id,d.Nombre,d.TipoMime,d.FechaUtc}).ToList()}).ToListAsync();
+    var empty=Array.Empty<object>();return Results.Ok(new{patients=empty,appointments=empty,doctors=empty,services=empty,specialties=empty,consultations=empty,prescriptions=empty,studies=orders,followups=empty,payments=empty,users=empty,logs=empty,clinic=(object?)null,documents=empty});
+   }
 
    var pq=db.Pacientes.AsNoTracking().AsQueryable();var aq=db.Citas.AsNoTracking().AsQueryable();var cq=db.Consultas.AsNoTracking().AsQueryable();
 
@@ -52,7 +56,7 @@ public static class PortalEndpoints {
 
    var consultationIds=cq.Select(x=>x.Id);
 
-   var patients=await pq.OrderBy(x=>x.Nombre).Select(x=>new{x.Id,x.UsuarioId,x.Nombre,x.Documento,x.FechaNacimiento,x.Telefono,x.Correo,x.Activo,x.Sexo,x.Direccion,Notas=clinical?x.Notas:"",Contacto=db.ContactosEmergencia.Where(c=>c.PacienteId==x.Id).Select(c=>new{c.Nombre,c.Telefono,c.Parentesco}).FirstOrDefault(),UltimaConsulta=db.Consultas.Where(c=>c.Cita!.PacienteId==x.Id&&(staff||c.Cita.Medico!.UsuarioId==uid)).Max(c=>(DateTime?)c.FechaUtc)}).ToListAsync();
+   var patients=await pq.OrderBy(x=>x.Nombre).Select(x=>new{x.Id,x.UsuarioId,x.Nombre,x.Documento,x.FechaNacimiento,x.Telefono,x.Correo,x.Activo,x.Sexo,x.Direccion,FotoDocumentoId=db.DocumentosPaciente.Where(d=>d.PacienteId==x.Id&&d.EsFoto).Select(d=>(int?)d.Id).FirstOrDefault(),FotoActualizadaUtc=db.DocumentosPaciente.Where(d=>d.PacienteId==x.Id&&d.EsFoto).Select(d=>(DateTime?)d.FechaUtc).FirstOrDefault(),Notas=clinical?x.Notas:"",Contacto=db.ContactosEmergencia.Where(c=>c.PacienteId==x.Id).Select(c=>new{c.Nombre,c.Telefono,c.Parentesco}).FirstOrDefault(),UltimaConsulta=db.Consultas.Where(c=>c.Cita!.PacienteId==x.Id&&(staff||c.Cita.Medico!.UsuarioId==uid)).Max(c=>(DateTime?)c.FechaUtc)}).ToListAsync();
 
    var appointments=await aq.OrderBy(x=>x.Inicio).Select(x=>new{x.Id,x.PacienteId,Paciente=x.Paciente!.Nombre,x.MedicoId,Medico=x.Medico!.Nombre,Especialidad=x.Medico.Especialidad,x.ServicioId,Servicio=x.Servicio!.Nombre,Precio=x.PrecioAcordado,x.Inicio,x.Fin,x.Motivo,x.Estado,Pagado=db.Pagos.Where(p=>p.CitaId==x.Id&&p.Estado=="Pagado").Sum(p=>(decimal?)p.Monto)??0m,Llegada=db.HistorialCitas.Where(h=>h.CitaId==x.Id&&h.EstadoNuevo=="En espera"&&!db.HistorialCitas.Any(r=>r.CitaId==x.Id&&r.EstadoNuevo=="Confirmada"&&r.Id>h.Id)).Min(h=>(DateTime?)h.FechaUtc)}).ToListAsync();
 
@@ -66,7 +70,7 @@ public static class PortalEndpoints {
 
    var prescriptions=await db.Recetas.AsNoTracking().Where(x=>consultationIds.Contains(x.ConsultaId)).OrderByDescending(x=>x.FechaUtc).Select(x=>new{x.Id,x.ConsultaId,PacienteId=x.Consulta!.Cita!.PacienteId,Paciente=x.Consulta.Cita.Paciente!.Nombre,Medico=x.Medico!.Nombre,Especialidad=x.Medico.Especialidad,x.Medico.Jvpm,Diagnostico=x.Consulta.Diagnostico,x.Indicaciones,x.Anulada,x.FechaUtc,Medicamentos=db.DetallesReceta.Where(d=>d.RecetaId==x.Id).Select(d=>new{d.Medicamento,d.Dosis,d.Frecuencia,d.Duracion,d.Presentacion,d.Indicaciones}).ToList()}).ToListAsync();
 
-   var studies=await db.EstudiosMedicos.AsNoTracking().Where(x=>consultationIds.Contains(x.ConsultaId)).Select(x=>new{x.Id,x.ConsultaId,PacienteId=x.Consulta!.Cita!.PacienteId,Paciente=x.Consulta.Cita.Paciente!.Nombre,Medico=x.Consulta.Cita.Medico!.Nombre,x.Tipo,x.Indicaciones,x.Estado,FechaUtc=x.Consulta.FechaUtc,Resultado=db.ResultadosEstudio.Where(r=>r.EstudioMedicoId==x.Id).Select(r=>new{r.Id,r.Descripcion,r.FechaUtc,r.Revisado}).FirstOrDefault()}).ToListAsync();
+   var studies=await db.EstudiosMedicos.AsNoTracking().Where(x=>consultationIds.Contains(x.ConsultaId)).Select(x=>new{x.Id,x.ConsultaId,PacienteId=x.Consulta!.Cita!.PacienteId,Paciente=x.Consulta.Cita.Paciente!.Nombre,Medico=x.Consulta.Cita.Medico!.Nombre,x.Tipo,x.Indicaciones,x.Estado,FechaUtc=x.Consulta.FechaUtc,Resultado=db.ResultadosEstudio.Where(r=>r.EstudioMedicoId==x.Id).Select(r=>new{r.Id,r.Descripcion,r.Interpretacion,r.FechaUtc,r.Revisado}).FirstOrDefault(),Archivos=db.DocumentosPaciente.Where(d=>d.EstudioMedicoId==x.Id).Select(d=>new{d.Id,d.Nombre,d.TipoMime,d.FechaUtc}).ToList()}).ToListAsync();
 
    var followups=await db.Seguimientos.AsNoTracking().Where(x=>consultationIds.Contains(x.ConsultaId)).Select(x=>new{x.Id,x.ConsultaId,PacienteId=x.Consulta!.Cita!.PacienteId,Paciente=x.Consulta.Cita.Paciente!.Nombre,Medico=x.Consulta.Cita.Medico!.Nombre,UltimaConsulta=x.Consulta.FechaUtc,x.Fecha,x.Motivo,x.Indicaciones,x.Estado,x.CitaFuturaId}).ToListAsync();
 
@@ -76,7 +80,7 @@ public static class PortalEndpoints {
 
    var logs=await db.Auditorias.AsNoTracking().Where(x=>admin).OrderByDescending(x=>x.FechaUtc).Take(500).Select(x=>new{x.Id,x.UsuarioId,x.Accion,x.Entidad,x.EntidadId,x.Descripcion,x.FechaUtc,Usuario=db.Usuarios.Where(u=>u.Id==x.UsuarioId).Select(u=>u.Nombre).FirstOrDefault(),Rol=db.Usuarios.Where(u=>u.Id==x.UsuarioId).Select(u=>u.Rol).FirstOrDefault()}).ToListAsync();
 
-   var documents=await db.DocumentosPaciente.AsNoTracking().Where(d=>clinical&&pq.Any(p=>p.Id==d.PacienteId)).Select(d=>new{d.Id,d.PacienteId,d.Nombre,d.TipoMime,d.FechaUtc,Usuario=db.Usuarios.Where(u=>u.Id==d.UsuarioCargaId).Select(u=>u.Nombre).FirstOrDefault()}).ToListAsync();
+   var documents=await db.DocumentosPaciente.AsNoTracking().Where(d=>clinical&&!d.EsFoto&&pq.Any(p=>p.Id==d.PacienteId)).Select(d=>new{d.Id,d.PacienteId,d.Nombre,d.TipoMime,d.FechaUtc,Usuario=db.Usuarios.Where(u=>u.Id==d.UsuarioCargaId).Select(u=>u.Nombre).FirstOrDefault()}).ToListAsync();
    var clinic=await db.ConfiguracionesConsultorio.AsNoTracking().FirstOrDefaultAsync();
 
    return Results.Ok(new{patients,appointments,doctors,services,specialties,consultations,prescriptions,studies,followups,payments,users,logs,clinic,documents});
@@ -112,7 +116,7 @@ public static class PortalEndpoints {
 
   api.MapPut("/usuarios/{id:int}",async(int id,UserEdit v,AppDbContext db,ClaimsPrincipal user)=>{
 
-   if(string.IsNullOrWhiteSpace(v.Nombre)||v.Nombre.Trim().Length>160||!Helpers.Email(v.Correo)||!new[]{"Administrador","Recepcionista","Medico","Paciente"}.Contains(v.Rol))return Helpers.Bad("Nombre, correo o rol inválidos.");
+   if(string.IsNullOrWhiteSpace(v.Nombre)||v.Nombre.Trim().Length>160||!Helpers.Email(v.Correo)||!new[]{"Administrador","Recepcionista","Medico","Paciente","Laboratorio"}.Contains(v.Rol))return Helpers.Bad("Nombre, correo o rol inválidos.");
 
    await using var tx=await db.Database.BeginTransactionAsync(IsolationLevel.Serializable);var u=await db.Usuarios.FindAsync(id);if(u==null)return Results.NotFound();
 
@@ -152,8 +156,14 @@ public static class PortalEndpoints {
 
   api.MapPost("/auth/password",async(PasswordInput v,AppDbContext db,ClaimsPrincipal user)=>{if(!Helpers.StrongPassword(v.Nueva))return Helpers.Bad("Use 12 caracteres o más, mayúscula, minúscula, número y símbolo (máximo 72 bytes).");var u=await db.Usuarios.FindAsync(Helpers.UserId(user));if(u==null||!BCrypt.Net.BCrypt.Verify(v.Actual,u.PasswordHash))return Helpers.Bad("Contraseña actual incorrecta.");u.PasswordHash=BCrypt.Net.BCrypt.HashPassword(v.Nueva,12);Audit(db,user,"CONTRASEÑA","Usuario",u.Id);await db.SaveChangesAsync();return Results.NoContent();});
 
-  api.MapPost("/estudios/{id:int}/resultado",async(int id,StudyResultInput v,AppDbContext db,ClaimsPrincipal user)=>{if(string.IsNullOrWhiteSpace(v.Descripcion)||v.Descripcion.Length>2500)return Helpers.Bad("Resultado obligatorio, máximo 2500 caracteres.");var s=await db.EstudiosMedicos.Include(x=>x.Consulta).ThenInclude(x=>x!.Cita).ThenInclude(x=>x!.Medico).FirstOrDefaultAsync(x=>x.Id==id);if(s==null)return Results.NotFound();if(s.Consulta!.Cita!.Medico!.UsuarioId!=Helpers.UserId(user))return Results.Forbid();if(await db.ResultadosEstudio.AnyAsync(x=>x.EstudioMedicoId==id))return Results.Conflict(new{error="El resultado ya está registrado."});db.ResultadosEstudio.Add(new ResultadoEstudio{EstudioMedicoId=id,Descripcion=v.Descripcion.Trim()});s.Estado="Resultado disponible";Audit(db,user,"RESULTADO","Estudio",id);await db.SaveChangesAsync();return Results.NoContent();}).RequireAuthorization(p=>p.RequireRole("Medico"));
+  api.MapPost("/estudios/{id:int}/resultado",async(int id,StudyResultInput v,AppDbContext db,ClaimsPrincipal user)=>{if(string.IsNullOrWhiteSpace(v.Descripcion)||v.Descripcion.Length>2500)return Helpers.Bad("Resultado obligatorio, máximo 2500 caracteres.");var s=await db.EstudiosMedicos.Include(x=>x.Consulta).ThenInclude(x=>x!.Cita).ThenInclude(x=>x!.Medico).FirstOrDefaultAsync(x=>x.Id==id);if(s==null)return Results.NotFound();if(!UploadRules.CanUploadStudy(Helpers.Role(user),Helpers.UserId(user),s.Consulta!.Cita!.Medico!.UsuarioId))return Results.Forbid();if(await db.ResultadosEstudio.AnyAsync(x=>x.EstudioMedicoId==id))return Results.Conflict(new{error="El resultado ya está registrado."});db.ResultadosEstudio.Add(new ResultadoEstudio{EstudioMedicoId=id,Descripcion=v.Descripcion.Trim()});s.Estado="Resultado disponible";Audit(db,user,"RESULTADO","Estudio",id);await db.SaveChangesAsync();return Results.NoContent();}).RequireAuthorization(p=>p.RequireRole("Medico","Laboratorio","Administrador"));
 
+  api.MapPut("/estudios/{id:int}/interpretacion",async(int id,StudyResultInput v,AppDbContext db,ClaimsPrincipal user)=>{
+   if(string.IsNullOrWhiteSpace(v.Descripcion)||v.Descripcion.Length>2500)return Helpers.Bad("Interpretación obligatoria, máximo 2500 caracteres.");
+   if(!await db.EstudiosMedicos.AnyAsync(x=>x.Id==id&&x.Consulta!.Cita!.Medico!.UsuarioId==Helpers.UserId(user)))return Results.Forbid();
+   var result=await db.ResultadosEstudio.FirstOrDefaultAsync(r=>r.EstudioMedicoId==id);if(result==null)return Helpers.Bad("Registre primero el resultado.");if(result.Revisado)return Helpers.Bad("El resultado ya fue revisado.");
+   result.Interpretacion=v.Descripcion.Trim();Audit(db,user,"INTERPRETAR","Estudio",id);await db.SaveChangesAsync();return Results.NoContent();
+  }).RequireAuthorization(p=>p.RequireRole("Medico"));
   api.MapPatch("/estudios/{id:int}/revisar",async(int id,AppDbContext db,ClaimsPrincipal user)=>{var s=await db.EstudiosMedicos.FirstOrDefaultAsync(x=>x.Id==id&&x.Consulta!.Cita!.Medico!.UsuarioId==Helpers.UserId(user));if(s==null)return Results.NotFound();var r=await db.ResultadosEstudio.FirstOrDefaultAsync(x=>x.EstudioMedicoId==id);if(r==null)return Helpers.Bad("Registre primero el resultado.");r.Revisado=true;s.Estado="Revisado";Audit(db,user,"REVISAR","Estudio",id);await db.SaveChangesAsync();return Results.NoContent();}).RequireAuthorization(p=>p.RequireRole("Medico"));
 
   api.MapPatch("/seguimientos/{id:int}/estado",async(int id,FollowStatus v,AppDbContext db,ClaimsPrincipal user)=>{var f=await db.Seguimientos.Include(x=>x.Consulta).ThenInclude(x=>x!.Cita).FirstOrDefaultAsync(x=>x.Id==id&&x.Consulta!.Cita!.Medico!.UsuarioId==Helpers.UserId(user));if(f==null)return Results.NotFound();if(v.Estado is not ("Programado" or "Completado" or "Pendiente"))return Helpers.Bad("Estado inválido.");if(v.Estado=="Programado"&&!await db.Citas.AnyAsync(x=>x.Id==v.CitaId&&x.PacienteId==f.Consulta!.Cita!.PacienteId&&x.Estado!="Cancelada"))return Helpers.Bad("Seleccione una cita del mismo paciente.");f.Estado=v.Estado;f.CitaFuturaId=v.Estado=="Programado"?v.CitaId:null;Audit(db,user,"ESTADO","Seguimiento",id);await db.SaveChangesAsync();return Results.NoContent();}).RequireAuthorization(p=>p.RequireRole("Medico"));

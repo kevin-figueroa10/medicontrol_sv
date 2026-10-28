@@ -30,7 +30,7 @@ export default function Login() {
       sessionStorage.setItem('mc_token',result.token);
       sessionStorage.setItem('mc_role',result.rol);
       sessionStorage.setItem('mc_name',result.nombre);
-      navigate(result.rol==='Medico'?'/doctor':result.rol==='Paciente'?'/patient':result.rol==='Recepcionista'?'/admin/waiting-room':'/admin',{replace:true});
+      navigate(result.rol==='Laboratorio'?'/laboratory':result.rol==='Medico'?'/doctor':result.rol==='Paciente'?'/patient':result.rol==='Recepcionista'?'/admin/waiting-room':'/admin',{replace:true});
     } catch (ex) {
       setErrors({password:ex instanceof Error?ex.message:'No se pudo iniciar sesión.'});
     } finally {setLoading(false);}

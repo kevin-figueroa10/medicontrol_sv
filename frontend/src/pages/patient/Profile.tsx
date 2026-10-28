@@ -1,3 +1,4 @@
+import PatientPhoto from '../../components/PatientPhoto';
 import {useClinic,initials} from '../../context/Clinic';
 import {PasswordForm} from '../../components/PasswordForm';
 import { useState } from 'react';
@@ -28,9 +29,7 @@ export default function PatientProfile() {const {panel,session,mutate}=useClinic
       {/* Avatar */}
       <div className="card p-6 mb-5">
         <div className="flex items-center gap-5">
-          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-400 to-indigo-600 text-white flex items-center justify-center text-2xl font-bold flex-shrink-0" style={{ fontFamily: 'DM Sans, sans-serif' }}>
-            {initials(String(session.nombre))}
-          </div>
+          {patient&&<PatientPhoto patient={patient} editable/>}
           <div>
             <h2 className="text-lg font-bold text-slate-900" style={{ fontFamily: 'DM Sans, sans-serif' }}>{form.firstName} {form.lastName}</h2>
             <div className="text-sm text-slate-500">{patient?`Código: PAC-${patient.id}`:'Tu cuenta aún no está vinculada a un expediente. Contacta a recepción.'}</div>

@@ -6,6 +6,7 @@ import { Plus, Edit3, UserX, UserCheck, Shield, KeyRound } from 'lucide-react';
 
 
 const roleBadge: Record<string, string> = {
+  'Laboratorio': 'bg-cyan-100 text-cyan-700',
   'Administrador': 'bg-purple-100 text-purple-700',
   'Médico': 'bg-blue-100 text-blue-700',
   'Recepcionista': 'bg-indigo-100 text-indigo-700',

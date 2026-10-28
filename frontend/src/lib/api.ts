@@ -24,4 +24,5 @@ export async function api<T>(path:string,options:RequestInit={}):Promise<T>{
 }
 export const loginApi=(correo:string,password:string)=>api<{token:string;rol:string;nombre:string}>('/auth/login',{method:'POST',body:JSON.stringify({correo,password})});
 
-export async function downloadDocument(id:number,name:string){const token=sessionStorage.getItem('mc_token');const r=await fetch(`${BASE}/api/documentos/${id}`,{headers:{Authorization:`Bearer ${token}`}});if(!r.ok)throw new Error('No se pudo descargar el documento.');const url=URL.createObjectURL(await r.blob());const a=document.createElement('a');a.href=url;a.download=name;a.click();URL.revokeObjectURL(url);}
+export async function documentBlob(id:number,signal?:AbortSignal){const token=sessionStorage.getItem('mc_token');const r=await fetch(`${BASE}/api/documentos/${id}`,{headers:{Authorization:`Bearer ${token}`},signal});if(!r.ok)throw new Error('No se pudo descargar el archivo privado.');return r.blob();}
+export async function downloadDocument(id:number,name:string){const url=URL.createObjectURL(await documentBlob(id));const a=document.createElement('a');a.href=url;a.download=name;a.click();URL.revokeObjectURL(url);}

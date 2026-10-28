@@ -18,7 +18,7 @@ public static class AppointmentEndpoints {
 
  public static void MapAppointments(this RouteGroupBuilder api){
 
-  var g=api.MapGroup("/citas");
+  var g=api.MapGroup("/citas").RequireAuthorization(p=>p.RequireRole("Administrador","Recepcionista","Medico","Paciente"));
 
   g.MapGet("/",async(AppDbContext db,ClaimsPrincipal user,DateTime? desde,DateTime? hasta)=>{
 

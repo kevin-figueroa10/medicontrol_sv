@@ -10,7 +10,7 @@ import {
   BookOpen, Home, RefreshCw
 } from 'lucide-react';
 
-type Role = 'admin' | 'doctor' | 'receptionist' | 'patient';
+type Role = 'admin' | 'doctor' | 'receptionist' | 'patient' | 'laboratory';
 
 interface NavItem {
   label: string;
@@ -19,6 +19,7 @@ interface NavItem {
 }
 
 const navByRole: Record<Role, NavItem[]> = {
+  laboratory: [{label:'Órdenes y resultados',icon:<FlaskConical size={16}/>,path:'/laboratory'}],
   admin: [
     { label: 'Dashboard', icon: <LayoutDashboard size={16} />, path: '/admin' },
     { label: 'Pacientes', icon: <Users size={16} />, path: '/admin/patients' },
@@ -64,6 +65,7 @@ const navByRole: Record<Role, NavItem[]> = {
 };
 
 const roleLabels: Record<Role, string> = {
+  laboratory: 'Laboratorio',
   admin: 'Administrador',
   doctor: 'Médico',
   receptionist: 'Recepcionista',
@@ -79,7 +81,7 @@ export default function Layout({ children }: LayoutProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const {session,reload}=useClinic();
-  const role:Role=({Administrador:'admin',Medico:'doctor',Recepcionista:'receptionist',Paciente:'patient'} as Record<string,Role>)[session.rol];
+  const role:Role=({Administrador:'admin',Medico:'doctor',Recepcionista:'receptionist',Paciente:'patient',Laboratorio:'laboratory'} as Record<string,Role>)[session.rol];
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
 

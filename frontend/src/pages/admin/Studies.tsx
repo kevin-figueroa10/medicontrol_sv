@@ -1,3 +1,5 @@
+import StudyInterpretation from '../../components/StudyInterpretation';
+import StudyFiles from '../../components/StudyFiles';
 import {useClinic,date,day,Row,download} from '../../context/Clinic';
 import {Modal,Field} from '../../components/ClinicalUI';
 import {ClinicalOrderForm,ActionForm} from '../../components/ManageForms';
@@ -30,13 +32,13 @@ export default function Studies() {
     <div className="p-6 max-w-screen-xl">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-xl font-bold text-slate-900" style={{ fontFamily: 'DM Sans, sans-serif' }}>Estudios médicos</h1>
+          <h1 className="text-xl font-bold text-slate-900" style={{ fontFamily: 'DM Sans, sans-serif' }}>{session.rol==='Laboratorio'?'Laboratorio · Órdenes y resultados':'Estudios médicos'}</h1>
           <p className="text-sm text-slate-500">{filtered.length} órdenes registradas</p>
         </div>
-        <button disabled={!doctor} className="btn btn-primary btn-sm" onClick={() => setShowModal(true)}>
+        {doctor&&<button className="btn btn-primary btn-sm" onClick={() => setShowModal(true)}>
           <Plus size={13} />
           Solicitar estudio
-        </button>
+        </button>}
       </div>
 
       <div className="card p-4 mb-4 flex flex-col sm:flex-row gap-3">
@@ -91,6 +93,6 @@ export default function Studies() {
       </div>
 
       {showModal&&<Modal title="Solicitar estudio médico" onClose={()=>setShowModal(false)}><ClinicalOrderForm kind="study" onClose={()=>setShowModal(false)}/></Modal>}
-      {selected&&<Modal title={selected.tipo} onClose={()=>setSelected(null)}><p className="text-sm text-slate-500 mb-3">{selected.paciente} · {selected.medico}</p><p className="text-sm mb-4">{selected.indicaciones||'Sin indicaciones adicionales.'}</p>{selected.resultado?<><div className="p-4 rounded-xl bg-slate-50 whitespace-pre-wrap text-sm">{selected.resultado.descripcion}</div>{doctor&&!selected.resultado.revisado&&<button className="btn btn-primary mt-4" onClick={async()=>{try{await mutate(`/estudios/${selected.id}/revisar`,undefined,'PATCH');setSelected(null);}catch{}}}>Marcar como revisado</button>}</>:doctor?<ActionForm onClose={()=>setSelected(null)} label="Guardar resultado" onSave={async()=>{await mutate(`/estudios/${selected.id}/resultado`,{descripcion:result});}}><Field label="Descripción del resultado"><textarea required maxLength={2500} className="input-field" rows={5} value={result} onChange={e=>setResult(e.target.value)}/></Field></ActionForm>:<p className="text-sm text-slate-500">Aún no se ha registrado un resultado.</p>}</Modal>}
+      {selected&&<Modal title={selected.tipo} onClose={()=>setSelected(null)}><p className="text-sm text-slate-500 mb-3">{selected.paciente} · {selected.medico}</p><p className="text-sm mb-4">{selected.indicaciones||'Sin indicaciones adicionales.'}</p><StudyFiles study={selected} onClose={()=>setSelected(null)}/>{selected.resultado?<><div className="p-4 rounded-xl bg-slate-50 whitespace-pre-wrap text-sm">{selected.resultado.descripcion}</div><StudyInterpretation study={selected} onClose={()=>setSelected(null)}/>{doctor&&!selected.resultado.revisado&&<button className="btn btn-primary mt-4" onClick={async()=>{try{await mutate(`/estudios/${selected.id}/revisar`,undefined,'PATCH');setSelected(null);}catch{}}}>Marcar como revisado</button>}</>:['Medico','Laboratorio','Administrador'].includes(session.rol)?<ActionForm onClose={()=>setSelected(null)} label="Guardar resultado" onSave={async()=>{await mutate(`/estudios/${selected.id}/resultado`,{descripcion:result});}}><Field label="Descripción del resultado"><textarea required maxLength={2500} className="input-field" rows={5} value={result} onChange={e=>setResult(e.target.value)}/></Field></ActionForm>:<p className="text-sm text-slate-500">Aún no se ha registrado un resultado.</p>}</Modal>}
     </div>);
 }

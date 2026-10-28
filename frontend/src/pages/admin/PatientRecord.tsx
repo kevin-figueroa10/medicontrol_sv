@@ -1,3 +1,4 @@
+import PatientPhoto from '../../components/PatientPhoto';
 import {useClinic,date,age,initials,Row} from '../../context/Clinic';
 import {appointmentStatus} from '../../lib/appointmentStatus';
 import {api,downloadDocument} from '../../lib/api';
@@ -54,9 +55,7 @@ export default function PatientRecord() {
       {/* Patient header */}
       <div className="card p-5 mb-4">
         <div className="flex flex-col sm:flex-row gap-5 items-start">
-          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-400 to-indigo-600 text-white flex items-center justify-center text-2xl font-bold flex-shrink-0" style={{ fontFamily: 'DM Sans, sans-serif' }}>
-            {initials(String(patient.nombre))}
-          </div>
+          <PatientPhoto patient={patient} editable/>
           <div className="flex-1">
             <div className="flex flex-wrap items-start gap-3 mb-2">
               <div>

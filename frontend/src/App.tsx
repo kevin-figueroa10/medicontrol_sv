@@ -29,7 +29,7 @@ const PatientPortal=lazy(()=>import('./pages/patient/Portal'));
 const PatientAppointments=lazy(()=>import('./pages/patient/Appointments'));
 const PatientPrescriptions=lazy(()=>import('./pages/patient/Prescriptions'));
 const PatientProfile=lazy(()=>import('./pages/patient/Profile'));
-const home=(role:string)=>role==='Medico'?'/doctor':role==='Paciente'?'/patient':role==='Recepcionista'?'/receptionist':'/admin';
+const home=(role:string)=>role==='Laboratorio'?'/laboratory':role==='Medico'?'/doctor':role==='Paciente'?'/patient':role==='Recepcionista'?'/receptionist':'/admin';
 function ProtectedLayout(){const navigate=useNavigate();const [session,setSession]=useState<Session|null>(null),[error,setError]=useState('');useEffect(()=>{if(!sessionStorage.getItem('mc_token')){navigate('/login',{replace:true});return;}api<Session>('/auth/me').then(me=>{sessionStorage.setItem('mc_role',me.rol);sessionStorage.setItem('mc_name',me.nombre);setSession(me);}).catch(ex=>setError(ex instanceof Error?ex.message:'No se pudo verificar la sesión.'));},[navigate]);if(!session)return <div className="min-h-screen grid place-items-center p-6 text-slate-500">{error||'Verificando sesión…'}</div>;return <ClinicProvider session={session}><Layout><Outlet/></Layout></ClinicProvider>}
 function Access({roles,children}:{roles:string[];children:React.ReactNode}){const {session}=useClinic();return roles.includes(session.rol)?children:<Navigate to={home(session.rol)} replace/>}
 function PatientFormRoute(){const location=useLocation();return <NewPatient key={location.search}/>;}
@@ -56,6 +56,7 @@ export default function App(){return <BrowserRouter><Suspense fallback={<div cla
 <Route path="/admin/studies" element={<Access roles={['Administrador','Medico']}><Studies/></Access>}/>
 <Route path="/admin/followups" element={<Access roles={['Administrador','Medico']}><Followups/></Access>}/>
 <Route path="/doctor" element={<Access roles={['Medico']}><DoctorDashboard/></Access>}/>
+<Route path="/laboratory" element={<Access roles={['Laboratorio']}><Studies/></Access>}/>
 <Route path="/doctor/consultation" element={<Access roles={['Medico']}><Consultation/></Access>}/>
 <Route path="/doctor/prescription" element={<Access roles={['Medico']}><Prescription/></Access>}/>
 <Route path="/patient" element={<Access roles={['Paciente']}><PatientPortal/></Access>}/>

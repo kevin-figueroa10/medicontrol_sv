@@ -9,6 +9,8 @@ using System.Threading.RateLimiting;
 using MediControlSV.Api.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.Services.AddHttpClient<PrivateFileStore>(client=>client.Timeout=TimeSpan.FromSeconds(45));
+builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(options=>options.MultipartBodyLengthLimit=6*1024*1024);
 var jwtKey = builder.Configuration["Jwt:Key"];
 if (string.IsNullOrWhiteSpace(jwtKey) || Encoding.UTF8.GetByteCount(jwtKey) < 32)
     throw new InvalidOperationException("Configure Jwt:Key con un secreto aleatorio de al menos 32 bytes, fuera del repositorio (user-secrets o variables de entorno).");
@@ -55,7 +57,7 @@ app.UseRateLimiter();
 app.UseAuthentication();app.UseAuthorization();
 app.MapGet("/api/health", async (AppDbContext db) => await db.Database.CanConnectAsync() ? Results.Ok(new { estado="activo", baseDatos="conectada" }) : Results.Problem("Sin conexión a SQL Server", statusCode:503));
 app.MapAuth();
-var secured=app.MapGroup("/api").RequireAuthorization().AddEndpointFilter<InputValidationFilter>();
+var secured=app.MapGroup("/api").RequireAuthorization().AddEndpointFilter<LaboratoryAccessFilter>().AddEndpointFilter<InputValidationFilter>();
 secured.MapPatients();
 secured.MapAppointments();
 secured.MapClinical();

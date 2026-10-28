@@ -21,6 +21,10 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
   b.Entity<MedicoEspecialidad>().HasKey(x=>new{x.MedicoId,x.EspecialidadId}); b.Entity<MedicoServicio>().HasKey(x=>new{x.MedicoId,x.ServicioId});
   b.Entity<Cita>().HasIndex(x=>new{x.MedicoId,x.Inicio,x.Fin}); b.Entity<Cita>().HasIndex(x=>new{x.PacienteId,x.Inicio}); b.Entity<Consulta>().HasIndex(x=>x.CitaId).IsUnique();
   b.Entity<ResultadoEstudio>().HasIndex(x=>x.EstudioMedicoId).IsUnique(); b.Entity<PreferenciaNotificacion>().HasIndex(x=>x.UsuarioId).IsUnique();
+  b.Entity<DocumentoPaciente>().Property(x=>x.EsFoto).HasDefaultValue(false);
+  b.Entity<DocumentoPaciente>().HasIndex(x=>x.EstudioMedicoId);
+  b.Entity<DocumentoPaciente>().HasIndex(x=>x.PacienteId).IsUnique().HasFilter("[EsFoto] = 1").HasDatabaseName("IX_DocumentosPaciente_FotoUnica");
+  b.Entity<DocumentoPaciente>().ToTable(t=>t.HasCheckConstraint("CK_DocumentosPaciente_Foto", "[EsFoto] = 0 OR ([EstudioMedicoId] IS NULL AND [TipoMime] IN ('image/png','image/jpeg'))"));
   b.Entity<Cita>().Property(x=>x.PrecioAcordado).HasPrecision(12,2);
   b.Entity<Servicio>().Property(x=>x.Precio).HasPrecision(12,2); b.Entity<Pago>().Property(x=>x.Monto).HasPrecision(12,2);
   b.Entity<SignosVitales>().Property(x=>x.Temperatura).HasPrecision(4,1); b.Entity<SignosVitales>().Property(x=>x.PesoKg).HasPrecision(6,2); b.Entity<SignosVitales>().Property(x=>x.AlturaCm).HasPrecision(5,1);

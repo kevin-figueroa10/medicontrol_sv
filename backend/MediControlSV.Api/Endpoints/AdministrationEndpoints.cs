@@ -35,7 +35,7 @@ public static class AdministrationEndpoints {
 
   api.MapPost("/usuarios",async(CreateUser v,AppDbContext db,ClaimsPrincipal user)=>{
 
-   if(string.IsNullOrWhiteSpace(v.Nombre)||v.Nombre.Length>160||!Helpers.Email(v.Correo)||!Helpers.StrongPassword(v.Password)||!new[]{"Administrador","Recepcionista","Medico","Paciente"}.Contains(v.Rol))return Helpers.Bad("Nombre, correo, contraseña fuerte y rol válido son obligatorios.");
+   if(string.IsNullOrWhiteSpace(v.Nombre)||v.Nombre.Length>160||!Helpers.Email(v.Correo)||!Helpers.StrongPassword(v.Password)||!new[]{"Administrador","Recepcionista","Medico","Paciente","Laboratorio"}.Contains(v.Rol))return Helpers.Bad("Nombre, correo, contraseña fuerte y rol válido son obligatorios.");
 
    var mail=v.Correo.Trim().ToLowerInvariant();if(await db.Usuarios.AnyAsync(x=>x.Correo==mail))return Results.Conflict(new{error="Correo ya registrado."});
 

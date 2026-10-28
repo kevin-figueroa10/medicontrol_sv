@@ -6,7 +6,9 @@ public static class DbInitializer {
   if(!env.IsDevelopment() || !config.GetValue<bool>("Database:InitializeDevelopment"))return;
   await db.Database.EnsureCreatedAsync();
   await db.Database.ExecuteSqlRawAsync(await File.ReadAllTextAsync(Path.Combine(AppContext.BaseDirectory,"SchemaUpgrade.sql")));
-  if(!await db.Roles.AnyAsync()) { db.Roles.AddRange(new[]{"Administrador","Recepcionista","Medico","Paciente"}.Select(x=>new Rol{Nombre=x})); await db.SaveChangesAsync(); }
+  await db.Database.ExecuteSqlRawAsync(await File.ReadAllTextAsync(Path.Combine(AppContext.BaseDirectory,"SchemaLaboratorio.sql")));
+  foreach(var role in new[]{"Administrador","Recepcionista","Medico","Paciente","Laboratorio"})if(!await db.Roles.AnyAsync(x=>x.Nombre==role))db.Roles.Add(new Rol{Nombre=role});
+  await db.SaveChangesAsync();
   if(!await db.Servicios.AnyAsync()) {db.Servicios.AddRange(new Servicio{Nombre="Consulta general",Precio=25m},new Servicio{Nombre="Control médico",Precio=20m});await db.SaveChangesAsync();}
   var email=config["Seed:AdminEmail"]; var pass=config["Seed:AdminPassword"];
   if(!string.IsNullOrWhiteSpace(email)&&!string.IsNullOrWhiteSpace(pass)&& !await db.Usuarios.AnyAsync()){

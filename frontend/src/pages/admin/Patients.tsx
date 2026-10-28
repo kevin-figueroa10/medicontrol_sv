@@ -1,3 +1,4 @@
+import PatientPhoto from '../../components/PatientPhoto';
 import {useClinic,date,age} from '../../context/Clinic';
 import { useState, useEffect } from 'react';
 import { useNavigate,useLocation } from 'react-router-dom';
@@ -98,9 +99,7 @@ export default function Patients() {
                   </td>
                   <td className="px-4 py-3.5">
                     <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-indigo-500 text-white flex items-center justify-center text-xs font-semibold flex-shrink-0">
-                        {p.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
-                      </div>
+                      <PatientPhoto patient={panel.patients.find(record=>record.id===p.id)!} compact/>
                       <div>
                         <div className="text-sm font-medium text-slate-800">{p.name}</div>
                         <div className="text-xs text-slate-400">{p.specialty}</div>

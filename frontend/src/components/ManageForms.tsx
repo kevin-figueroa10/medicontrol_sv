@@ -13,7 +13,7 @@ export function UserForm({edit,onClose}:{edit?:Row;onClose:()=>void}){
  <Field label="Correo electrónico"><input type="email" className="input-field" required maxLength={200} value={form.correo} onChange={e=>set('correo',e.target.value)}/></Field>
  {!edit&&<Field label="Contraseña inicial"><input type="password" autoComplete="new-password" className="input-field" required minLength={12} maxLength={72} value={form.password} onChange={e=>set('password',e.target.value)}/><span className="text-xs text-slate-500">Mínimo 12 caracteres, mayúscula, minúscula, número y símbolo.</span></Field>}
  {!edit&&<Field label="Confirmar contraseña"><input type="password" autoComplete="new-password" className="input-field" required minLength={12} maxLength={72} value={confirmation} onChange={e=>setConfirmation(e.target.value)}/></Field>}
- <Field label="Rol"><select className="input-field" value={form.rol} onChange={e=>set('rol',e.target.value)}>{['Administrador','Medico','Recepcionista','Paciente'].map(r=><option key={r} value={r}>{r==='Medico'?'Médico':r}</option>)}</select></Field>
+ <Field label="Rol"><select className="input-field" value={form.rol} onChange={e=>set('rol',e.target.value)}>{['Administrador','Medico','Recepcionista','Paciente','Laboratorio'].map(r=><option key={r} value={r}>{r==='Medico'?'Médico':r}</option>)}</select></Field>
  {form.rol==='Paciente'&&<Field label="Vincular a expediente"><select className="input-field" value={form.pacienteId} onChange={e=>set('pacienteId',e.target.value)}><option value="">Sin vincular por ahora</option>{panel.patients.filter(p=>!p.usuarioId||p.usuarioId===edit?.id).map(p=><option key={p.id} value={p.id}>{p.nombre} · {p.documento}</option>)}</select></Field>}
  </ActionForm>
 }
