@@ -1,4 +1,5 @@
 import {useEffect} from 'react';
+import UnattendedAppointments from '../../components/UnattendedAppointments';
 import {useClinic,day} from '../../context/Clinic';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -38,6 +39,7 @@ export default function WaitingRoom() {
       </div>
 
       {/* Summary cards */}
+      <UnattendedAppointments/>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         {[
           { label: 'En espera', value: waiting.length, icon: <Clock size={18} />, color: 'text-amber-600', bg: 'bg-amber-50' },

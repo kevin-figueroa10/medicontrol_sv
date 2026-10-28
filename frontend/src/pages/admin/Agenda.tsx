@@ -1,4 +1,6 @@
 import {useClinic,day} from '../../context/Clinic';
+import UnattendedAppointments from '../../components/UnattendedAppointments';
+import {appointmentStatus} from '../../lib/appointmentStatus';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, Plus, Filter } from 'lucide-react';
@@ -6,6 +8,7 @@ import { ChevronLeft, ChevronRight, Plus, Filter } from 'lucide-react';
 type View = 'day' | 'week' | 'month';
 
 const statusColor: Record<string, { bg: string; text: string; border: string }> = {
+  'No atendida': {bg:'bg-orange-50',text:'text-orange-800',border:'border-l-orange-500'},
   'Solicitada':  { bg: 'bg-slate-100', text: 'text-slate-700', border: 'border-l-slate-400' },
   'Confirmada':  { bg: 'bg-blue-50', text: 'text-blue-800', border: 'border-l-blue-500' },
   'En espera':   { bg: 'bg-amber-50', text: 'text-amber-800', border: 'border-l-amber-500' },
@@ -38,7 +41,7 @@ export default function Agenda() {
   const navigate = useNavigate();const {panel,session}=useClinic();
   const hours=[...new Set([...baseHours,...panel.appointments.map(a=>{const d=new Date(a.inicio);return String(d.getHours()).padStart(2,'0')+':'+String(Math.floor(d.getMinutes()/30)*30).padStart(2,'0');})])].sort();
   const appts:Record<string,{patient:string;doctor:string;status:string;motivo:string}[]>={};
-  for(const a of panel.appointments){const d=new Date(a.inicio);const key=day(a.inicio)+' '+String(d.getHours()).padStart(2,'0')+':'+String(Math.floor(d.getMinutes()/30)*30).padStart(2,'0');(appts[key]??=[]).push({patient:String(a.paciente),doctor:String(a.medico),status:String(a.estado),motivo:String(a.motivo)});}
+  for(const a of panel.appointments){const d=new Date(a.inicio);const key=day(a.inicio)+' '+String(d.getHours()).padStart(2,'0')+':'+String(Math.floor(d.getMinutes()/30)*30).padStart(2,'0');(appts[key]??=[]).push({patient:String(a.paciente),doctor:String(a.medico),status:appointmentStatus({estado:a.estado,inicio:a.inicio}),motivo:String(a.motivo)});}
 
   const [view, setView] = useState<View>('week');
   const [currentDate, setCurrentDate] = useState(new Date()); // Sep 13
@@ -98,6 +101,7 @@ export default function Agenda() {
       </div>
 
       {/* Week view */}
+      <UnattendedAppointments/>
       {view === 'week' && (
         <div className="card overflow-hidden">
           {/* Day headers */}
@@ -137,6 +141,7 @@ export default function Agenda() {
                           >
                             <div className="text-xs font-semibold leading-tight truncate">{a.patient}</div>
                             <div className="text-xs opacity-75 truncate leading-tight">{a.doctor}</div>
+                            <div className="text-xs">{a.status}</div>
                           </button>
                         );
                       })}

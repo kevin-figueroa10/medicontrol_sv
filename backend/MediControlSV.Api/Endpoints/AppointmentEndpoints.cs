@@ -61,12 +61,18 @@ public static class AppointmentEndpoints {
 
    var start=Helpers.Utc(v.Inicio);var end=Helpers.Utc(v.Fin);if(start<DateTime.UtcNow||end<=start||end-start>TimeSpan.FromHours(4)||string.IsNullOrWhiteSpace(v.Motivo)||v.Motivo.Length>200)return Helpers.Bad("Horario o motivo inválidos.");
 
-   await using var tx=await db.Database.BeginTransactionAsync(IsolationLevel.Serializable);var c=await db.Citas.Include(x=>x.Paciente).FirstOrDefaultAsync(x=>x.Id==id);if(c==null)return Results.NotFound();if(c.Estado!="Confirmada")return Helpers.Bad("Solo se reprograman citas confirmadas.");var config=await db.ConfiguracionesConsultorio.AsNoTracking().FirstOrDefaultAsync();if(start>DateTime.UtcNow.AddDays(config?.AnticipoDias??60))return Helpers.Bad("Anticipo fuera del límite.");if(Helpers.Role(user)=="Paciente"&&(c.Paciente!.UsuarioId!=Helpers.UserId(user)||c.Inicio<DateTime.UtcNow.AddHours(config?.CancelacionHoras??24)))return Results.Forbid();
+   await using var tx=await db.Database.BeginTransactionAsync(IsolationLevel.Serializable);var c=await db.Citas.Include(x=>x.Paciente).FirstOrDefaultAsync(x=>x.Id==id);if(c==null)return Results.NotFound();
+   if(!Helpers.CanReschedule(c.Estado,c.Inicio,Helpers.Role(user),DateTime.UtcNow))return Helpers.Bad("Solo se reprograman citas confirmadas o, desde recepción, citas sin atender de días anteriores y ausencias.");
+   if(await db.Consultas.AnyAsync(x=>x.CitaId==id))return Helpers.Bad("La cita ya tiene una consulta registrada y no puede reprogramarse.");
+   var config=await db.ConfiguracionesConsultorio.AsNoTracking().FirstOrDefaultAsync();if(start>DateTime.UtcNow.AddDays(config?.AnticipoDias??60))return Helpers.Bad("Anticipo fuera del límite.");if(Helpers.Role(user)=="Paciente"&&(c.Paciente!.UsuarioId!=Helpers.UserId(user)||c.Inicio<DateTime.UtcNow.AddHours(config?.CancelacionHoras??24)))return Results.Forbid();
 
    if(!await AgendaRules.Allowed(db,c.MedicoId,start,end))return Helpers.Bad("Horario fuera de la jornada del médico.");
    if(await db.Citas.AnyAsync(x=>x.Id!=id&&x.Estado!="Cancelada"&&x.Estado!="No asistió"&&(x.MedicoId==c.MedicoId||x.PacienteId==c.PacienteId)&&x.Inicio<end&&x.Fin>start)||await db.BloqueosAgenda.AnyAsync(x=>x.MedicoId==c.MedicoId&&x.Inicio<end&&x.Fin>start))return Results.Conflict(new{error="El horario ya está ocupado o bloqueado."});
 
-   c.Inicio=start;c.Fin=end;db.HistorialCitas.Add(new HistorialCita{CitaId=id,UsuarioId=Helpers.UserId(user),EstadoAnterior=c.Estado,EstadoNuevo=c.Estado,Motivo=v.Motivo});PortalEndpoints.Audit(db,user,"REPROGRAMAR","Cita",id);await db.SaveChangesAsync();await tx.CommitAsync();return Results.NoContent();
+   var previous=c.Estado;var previousStart=c.Inicio;var previousEnd=c.Fin;c.Inicio=start;c.Fin=end;c.Estado="Confirmada";
+   db.HistorialCitas.Add(new HistorialCita{CitaId=id,UsuarioId=Helpers.UserId(user),EstadoAnterior=previous,EstadoNuevo="Confirmada",Motivo=v.Motivo});
+   db.Auditorias.Add(new Auditoria{UsuarioId=Helpers.UserId(user),Accion="REPROGRAMAR",Entidad="Cita",EntidadId=id,Descripcion=$"{previousStart:O} / {previousEnd:O} → {start:O} / {end:O}"});
+   await db.SaveChangesAsync();await tx.CommitAsync();return Results.NoContent();
 
   }).RequireAuthorization(p=>p.RequireRole("Administrador","Recepcionista","Paciente"));
 
