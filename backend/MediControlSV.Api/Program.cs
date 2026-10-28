@@ -30,7 +30,7 @@ builder.Services.AddAuthorization(o => o.AddPolicy("Administracion", p => p.Requ
 var frontendOrigins = (builder.Configuration["Cors:AllowedOrigins"] ?? "")
     .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
     .Select(origin => origin.TrimEnd('/'))
-    .Concat(new[] { "http://localhost:5173", "http://127.0.0.1:5173" })
+    .Concat(new[] { "http://localhost:5173", "http://127.0.0.1:5173", "https://medicontrol-sv.vercel.app" })
     .Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
 builder.Services.AddCors(o => o.AddPolicy("Frontend", p => p.WithOrigins(frontendOrigins).AllowAnyHeader().AllowAnyMethod()));
 builder.Services.AddRateLimiter(options => {

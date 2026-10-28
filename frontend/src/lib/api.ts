@@ -8,8 +8,11 @@ export async function api<T>(path:string,options:RequestInit={}):Promise<T>{
  if(options.body&&!(options.body instanceof FormData))headers.set('Content-Type','application/json');
  if(token)headers.set('Authorization',`Bearer ${token}`);
  let response:Response;
- try {response=await fetch(`${BASE}/api${path}`,{...options,headers,signal:options.signal??AbortSignal.timeout(90000)});}
+ const controller=options.signal?undefined:new AbortController();
+ const timeout=controller?setTimeout(()=>controller.abort(),90000):undefined;
+ try {response=await fetch(`${BASE}/api${path}`,{...options,headers,signal:options.signal??controller!.signal});}
  catch {throw new ApiError(0,'No se pudo conectar con el servidor. Compruebe la conexión y vuelva a intentar.');}
+ finally {if(timeout!==undefined)clearTimeout(timeout);}
  if(!response.ok){
   const content=await response.text();let detail='';
   try {const body=JSON.parse(content);detail=body.error||body.detail||(body.errors?Object.values(body.errors).flat().join(' '):'');}catch{}
