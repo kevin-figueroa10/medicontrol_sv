@@ -1,4 +1,5 @@
 import {useClinic,date,age,initials,Row} from '../../context/Clinic';
+import {appointmentStatus} from '../../lib/appointmentStatus';
 import {api,downloadDocument} from '../../lib/api';
 import {Modal} from '../../components/ClinicalUI';
 import { useState } from 'react';
@@ -31,7 +32,7 @@ export default function PatientRecord() {
   const prescriptions=ps.map(p=>({id:p.id,date:date(p.fechaUtc),doctor:String(p.medico),meds:(p.medicamentos as Row[]).map(m=>`${m.medicamento} · ${m.dosis} · ${m.frecuencia} · ${m.duracion}`)}));
   const studies=ss.map(s=>({id:s.id,date:date(s.fechaUtc),study:String(s.tipo),doctor:String(s.medico),status:String(s.estado)}));
   const followups=panel.followups.filter(f=>f.pacienteId===id).map(f=>({date:date(f.ultimaConsulta),doctor:String(f.medico),reason:String(f.motivo),recommended:date(f.fecha),status:String(f.estado)}));
-  const appointments=as.map(a=>({date:date(a.inicio),time:new Date(a.inicio).toLocaleTimeString('es-SV',{hour:'2-digit',minute:'2-digit'}),doctor:String(a.medico),specialty:String(a.especialidad),reason:String(a.motivo),status:String(a.estado)}));
+  const appointments=as.map(a=>({date:date(a.inicio),time:new Date(a.inicio).toLocaleTimeString('es-SV',{hour:'2-digit',minute:'2-digit'}),doctor:String(a.medico),specialty:String(a.especialidad),reason:String(a.motivo),status:appointmentStatus({estado:a.estado,inicio:a.inicio})}));
   const docs=panel.documents.filter(d=>d.pacienteId===id).map(d=>({id:d.id,name:String(d.nombre),type:String(d.tipoMime).split('/')[1].toUpperCase(),date:date(d.fechaUtc),doctor:String(d.usuario||'—')}));
   const timeline=cs.map(c=>({date:date(c.fechaUtc),event:'Consulta',detail:String(c.diagnostico),type:'consult'}));
   const upcoming=as.find(a=>new Date(a.inicio)>new Date()&&!['Cancelada','No asistió'].includes(a.estado));

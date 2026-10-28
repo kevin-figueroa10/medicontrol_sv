@@ -22,10 +22,19 @@ Check(Helpers.Utc(new DateTime(2026,10,23)).Kind==DateTimeKind.Utc,"Fechas SQL e
 Console.WriteLine($"OK: {count} comprobaciones de reglas de acceso, estados y validaciones.");
 var rescheduleNow=new DateTime(2026,10,28,12,0,0,DateTimeKind.Utc);
 foreach(var role in roles)foreach(var state in states){
- var staff=role is "Administrador" or "Recepcionista";
+ var staff=role is "Administrador" or "Recepcionista" or "Medico";
  var expected=(staff||role=="Paciente")&&state=="Confirmada"||staff&&(state=="En espera"||state=="No asistió");
  Check(Helpers.CanReschedule(state,rescheduleNow.AddDays(-1),role,rescheduleNow)==expected,$"Reprogramación vencida {role}/{state}");
 }
 Check(!Helpers.CanReschedule("En espera",rescheduleNow,"Recepcionista",rescheduleNow),"No reprogramar espera del día como vencida");
 Check(Helpers.CanReschedule("En espera",new DateTime(2026,10,28,5,59,0,DateTimeKind.Utc),"Recepcionista",new DateTime(2026,10,28,6,1,0,DateTimeKind.Utc)),"Cambio de día de El Salvador");
 Console.WriteLine($"OK: {count} comprobaciones, incluida reprogramación por rol y zona horaria.");
+Check(Helpers.CanManageAppointment("Medico",7,7),"Médico modifica su propia cita");
+Check(!Helpers.CanManageAppointment("Medico",7,8),"Médico no modifica citas de otro médico");
+Check(!Helpers.CanManageAppointment("Medico",7,null),"Médico no modifica citas sin asignación");
+Check(!Helpers.CanManageAppointment("Medico",null,null),"Sin identidad no hay acceso");
+Check(Helpers.CanManageAppointment("Administrador",1,8),"Administrador gestiona todos los médicos");
+Check(!Helpers.CanManageAppointment("Paciente",7,7),"Paciente no hereda permisos de médico");
+Check(!Helpers.CanReschedule("En consulta",rescheduleNow.AddDays(-1),"Medico",rescheduleNow),"No reprogramar consulta iniciada");
+Check(!Helpers.CanReschedule("Finalizada",rescheduleNow.AddDays(-1),"Medico",rescheduleNow),"No reprogramar consulta finalizada");
+Console.WriteLine($"OK: {count} comprobaciones, incluido aislamiento de citas por médico.");

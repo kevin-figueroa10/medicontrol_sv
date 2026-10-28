@@ -11,6 +11,7 @@ const PatientRecord=lazy(()=>import('./pages/admin/PatientRecord'));
 const Doctors=lazy(()=>import('./pages/admin/Doctors'));
 const Specialties=lazy(()=>import('./pages/admin/Specialties'));
 const Agenda=lazy(()=>import('./pages/admin/Agenda'));
+const AppointmentHistory=lazy(()=>import('./pages/admin/AppointmentHistory'));
 const BookAppointment=lazy(()=>import('./pages/admin/BookAppointment'));
 const WaitingRoom=lazy(()=>import('./pages/admin/WaitingRoom'));
 const Payments=lazy(()=>import('./pages/admin/Payments'));
@@ -44,6 +45,7 @@ export default function App(){return <BrowserRouter><Suspense fallback={<div cla
 <Route path="/admin/doctors" element={<Access roles={admin}><Doctors/></Access>}/>
 <Route path="/admin/specialties" element={<Access roles={admin}><Specialties/></Access>}/>
 <Route path="/admin/agenda" element={<Access roles={care}><Agenda/></Access>}/>
+<Route path="/admin/appointments/history" element={<Access roles={care}><AppointmentHistory/></Access>}/>
 <Route path="/admin/book" element={<Access roles={staff}><BookAppointment/></Access>}/>
 <Route path="/admin/waiting-room" element={<Access roles={care}><WaitingRoom/></Access>}/>
 <Route path="/admin/payments" element={<Access roles={staff}><Payments/></Access>}/>

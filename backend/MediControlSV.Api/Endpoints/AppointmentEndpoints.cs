@@ -61,8 +61,9 @@ public static class AppointmentEndpoints {
 
    var start=Helpers.Utc(v.Inicio);var end=Helpers.Utc(v.Fin);if(start<DateTime.UtcNow||end<=start||end-start>TimeSpan.FromHours(4)||string.IsNullOrWhiteSpace(v.Motivo)||v.Motivo.Length>200)return Helpers.Bad("Horario o motivo inválidos.");
 
-   await using var tx=await db.Database.BeginTransactionAsync(IsolationLevel.Serializable);var c=await db.Citas.Include(x=>x.Paciente).FirstOrDefaultAsync(x=>x.Id==id);if(c==null)return Results.NotFound();
-   if(!Helpers.CanReschedule(c.Estado,c.Inicio,Helpers.Role(user),DateTime.UtcNow))return Helpers.Bad("Solo se reprograman citas confirmadas o, desde recepción, citas sin atender de días anteriores y ausencias.");
+   await using var tx=await db.Database.BeginTransactionAsync(IsolationLevel.Serializable);var c=await db.Citas.Include(x=>x.Paciente).Include(x=>x.Medico).FirstOrDefaultAsync(x=>x.Id==id);if(c==null)return Results.NotFound();
+   if(Helpers.Role(user)!="Paciente"&&!Helpers.CanManageAppointment(Helpers.Role(user),Helpers.UserId(user),c.Medico?.UsuarioId))return Results.Forbid();
+   if(!Helpers.CanReschedule(c.Estado,c.Inicio,Helpers.Role(user),DateTime.UtcNow))return Helpers.Bad("Solo se reprograman citas confirmadas, citas sin atender de días anteriores y ausencias, según sus permisos.");
    if(await db.Consultas.AnyAsync(x=>x.CitaId==id))return Helpers.Bad("La cita ya tiene una consulta registrada y no puede reprogramarse.");
    var config=await db.ConfiguracionesConsultorio.AsNoTracking().FirstOrDefaultAsync();if(start>DateTime.UtcNow.AddDays(config?.AnticipoDias??60))return Helpers.Bad("Anticipo fuera del límite.");if(Helpers.Role(user)=="Paciente"&&(c.Paciente!.UsuarioId!=Helpers.UserId(user)||c.Inicio<DateTime.UtcNow.AddHours(config?.CancelacionHoras??24)))return Results.Forbid();
 
@@ -74,7 +75,7 @@ public static class AppointmentEndpoints {
    db.Auditorias.Add(new Auditoria{UsuarioId=Helpers.UserId(user),Accion="REPROGRAMAR",Entidad="Cita",EntidadId=id,Descripcion=$"{previousStart:O} / {previousEnd:O} → {start:O} / {end:O}"});
    await db.SaveChangesAsync();await tx.CommitAsync();return Results.NoContent();
 
-  }).RequireAuthorization(p=>p.RequireRole("Administrador","Recepcionista","Paciente"));
+  }).RequireAuthorization(p=>p.RequireRole("Administrador","Recepcionista","Medico","Paciente"));
 
   g.MapPatch("/{id:int}/estado",async(int id,string estado,AppDbContext db,ClaimsPrincipal user)=>{
 

@@ -2,8 +2,9 @@ using System.Security.Claims;
 using System.Text.RegularExpressions;
 namespace MediControlSV.Api.Infrastructure;
 public static class Helpers {
+ public static bool CanManageAppointment(string? role,int? actorId,int? doctorUserId)=>actorId>0&&(role is "Administrador" or "Recepcionista"||(role=="Medico"&&doctorUserId==actorId));
  public static bool CanReschedule(string state,DateTime start,string? role,DateTime now){
-  if(role is not ("Administrador" or "Recepcionista" or "Paciente"))return false;
+  if(role is not ("Administrador" or "Recepcionista" or "Medico" or "Paciente"))return false;
   if(state=="Confirmada")return true;
   if(role=="Paciente")return false;
   var zone=TimeZoneInfo.FindSystemTimeZoneById("Central America Standard Time");

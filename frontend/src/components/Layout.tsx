@@ -25,6 +25,7 @@ const navByRole: Record<Role, NavItem[]> = {
     { label: 'Médicos', icon: <Stethoscope size={16} />, path: '/admin/doctors' },
     { label: 'Especialidades', icon: <ClipboardList size={16} />, path: '/admin/specialties' },
     { label: 'Citas', icon: <Calendar size={16} />, path: '/admin/agenda' },
+    { label: 'Historial de citas', icon: <BookOpen size={16} />, path: '/admin/appointments/history' },
     { label: 'Sala de espera', icon: <Clock size={16} />, path: '/admin/waiting-room' },
     { label: 'Pagos', icon: <CreditCard size={16} />, path: '/admin/payments' },
     { label: 'Reportes', icon: <BarChart3 size={16} />, path: '/admin/reports' },
@@ -35,6 +36,7 @@ const navByRole: Record<Role, NavItem[]> = {
   doctor: [
     { label: 'Inicio', icon: <Home size={16} />, path: '/doctor' },
     { label: 'Mi agenda', icon: <Calendar size={16} />, path: '/admin/agenda' },
+    { label: 'Historial de citas', icon: <BookOpen size={16} />, path: '/admin/appointments/history' },
     { label: 'Mis pacientes', icon: <Users size={16} />, path: '/admin/patients' },
     { label: 'Sala de espera', icon: <Clock size={16} />, path: '/admin/waiting-room' },
     { label: 'Consultas', icon: <ClipboardList size={16} />, path: '/doctor/consultation' },
@@ -46,6 +48,7 @@ const navByRole: Record<Role, NavItem[]> = {
     { label: 'Inicio', icon: <Home size={16} />, path: '/receptionist' },
     { label: 'Pacientes', icon: <Users size={16} />, path: '/admin/patients' },
     { label: 'Citas', icon: <Calendar size={16} />, path: '/admin/agenda' },
+    { label: 'Historial de citas', icon: <BookOpen size={16} />, path: '/admin/appointments/history' },
     { label: 'Sala de espera', icon: <Clock size={16} />, path: '/admin/waiting-room' },
     { label: 'Pagos', icon: <CreditCard size={16} />, path: '/admin/payments' },
   ],
