@@ -83,15 +83,16 @@ public static class PortalEndpoints {
 
   });
 
-  api.MapGet("/medicos/{id:int}/disponibilidad",async(int id,DateOnly fecha,AppDbContext db)=>{
+  api.MapGet("/medicos/{id:int}/disponibilidad",async(int id,DateOnly fecha,int? citaId,AppDbContext db,ClaimsPrincipal user)=>{
 
-   if(!await db.Medicos.AnyAsync(x=>x.Id==id&&x.Activo))return Results.NotFound();
+   if(!await db.Medicos.AnyAsync(x=>x.Id==id&&x.Activo&&x.Usuario!=null&&x.Usuario.Activo))return Results.NotFound();
+   if(citaId.HasValue){var role=Helpers.Role(user);var uid=Helpers.UserId(user);if(!await db.Citas.AnyAsync(x=>x.Id==citaId&&(role=="Administrador"||role=="Recepcionista"||(role=="Medico"&&x.Medico!.UsuarioId==uid)||(role=="Paciente"&&x.Paciente!.UsuarioId==uid))))return Results.Forbid();}
 
    var zone=TimeZoneInfo.FindSystemTimeZoneById("Central America Standard Time");
 
    var start=TimeZoneInfo.ConvertTimeToUtc(fecha.ToDateTime(TimeOnly.MinValue),zone);var end=start.AddDays(1);
 
-   var occupied=await db.Citas.AsNoTracking().Where(x=>x.MedicoId==id&&x.Estado!="Cancelada"&&x.Estado!="No asistió"&&x.Inicio<end&&x.Fin>start).Select(x=>new{x.Inicio,x.Fin}).ToListAsync();
+   var occupied=await db.Citas.AsNoTracking().Where(x=>x.Id!=citaId&&x.MedicoId==id&&x.Estado!="Cancelada"&&x.Estado!="No asistió"&&x.Inicio<end&&x.Fin>start).Select(x=>new{x.Inicio,x.Fin}).ToListAsync();
 
    var blocked=await db.BloqueosAgenda.AsNoTracking().Where(x=>x.MedicoId==id&&x.Inicio<end&&x.Fin>start).Select(x=>new{x.Inicio,x.Fin}).ToListAsync();
 

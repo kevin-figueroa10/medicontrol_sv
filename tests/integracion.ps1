@@ -106,7 +106,8 @@ $reception=Request GET '/panel' $null $rec
 Check ($reception.consultations.Count-eq0-and$reception.prescriptions.Count-eq0) 'Recepción sin acceso clínico'
 Check ($reception.payments.Count-eq2) 'Pagos persistidos'
 $notifications=Request GET '/notificaciones' $null $pat
-Check ($notifications.Count-eq1) 'Notificación real de cita'
+Check (@($notifications|Where-Object titulo -eq 'Cita confirmada').Count-eq1) 'Notificación real de cita'
+Check (@($notifications|Where-Object titulo -eq 'Cita reprogramada').Count-ge1) 'Notificación de reprogramación'
 Request PATCH '/notificaciones/leidas' $null $pat 204 | Out-Null
 $notifications=Request GET '/notificaciones' $null $pat
 Check ($notifications[0].leida) 'Notificación leída persistida'

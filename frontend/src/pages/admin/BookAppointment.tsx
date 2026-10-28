@@ -1,5 +1,5 @@
-import {useEffect} from 'react';
-import {api} from '../../lib/api';
+import {useDoctorSlots} from '../../lib/useDoctorSlots';
+import {clinicStart} from '../../lib/doctorSlots';
 import {useClinic,day,money,Row} from '../../context/Clinic';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -15,7 +15,6 @@ const steps = [
   { label: 'Confirmar', icon: <Check size={16} /> },
 ];
 
-const timeSlots = ['08:00', '08:30', '09:00', '09:30', '10:00', '10:30', '11:00', '11:30', '14:00', '14:30', '15:00', '15:30', '16:00'];
 
 
 export default function BookAppointment() {
@@ -25,7 +24,6 @@ export default function BookAppointment() {
   const patients=panel.patients.filter(p=>p.activo&&String(p.nombre).toLowerCase().includes(search.toLowerCase())).map(p=>`${p.nombre} · #${p.id}`);
   const specialties=[...new Set(panel.doctors.filter(d=>d.activo).map(d=>String(d.especialidad)))];
   const doctors:Record<string,string[]>={};for(const d of panel.doctors.filter(d=>d.activo))(doctors[d.especialidad]??=[]).push(`${d.nombre} · #${d.id}`);
-  const [availability,setAvailability]=useState<{ocupados:Row[];bloqueados:Row[];horarios:Row[]}|null>(null);
 
   const [step, setStep] = useState(0);
   const [data, setData] = useState({
@@ -40,12 +38,13 @@ export default function BookAppointment() {
 
   const selectedDoctor=panel.doctors.find(d=>`${d.nombre} · #${d.id}`===data.doctor);
   const selectedPatient=panel.patients.find(p=>`${p.nombre} · #${p.id}`===data.patient);
-  useEffect(()=>{setAvailability(null);if(!selectedDoctor||!data.date)return;const controller=new AbortController();api<{ocupados:Row[];bloqueados:Row[];horarios:Row[]}>(`/medicos/${selectedDoctor.id}/disponibilidad?fecha=${data.date}`,{signal:controller.signal}).then(setAvailability).catch(()=>{if(!controller.signal.aborted)setError('No se pudo comprobar el horario.');});return ()=>controller.abort();},[selectedDoctor?.id,data.date]);
   const duration=Number(panel.services.find(s=>s.id===Number(service))?.duracionMinutos||panel.clinic?.duracionMinutos||30)*60000;
-  const bookedSlots=timeSlots.filter(t=>{const start=new Date(data.date+'T'+t),end=new Date(start.valueOf()+duration);return !availability||(availability.horarios.length>0&&!availability.horarios.some(h=>h.diaSemana===start.getDay()&&t>=String(h.desde).slice(0,5)&&new Date(end).toTimeString().slice(0,5)<=String(h.hasta).slice(0,5)))||start<new Date()||[...availability.ocupados,...availability.bloqueados].some(a=>new Date(a.inicio)<end&&new Date(a.fin)>start)||panel.appointments.some(a=>a.pacienteId===selectedPatient?.id&&!['Cancelada','No asistió'].includes(a.estado)&&new Date(a.inicio)<end&&new Date(a.fin)>start);});
-  const next = () => {setError('');if([!data.patient,!data.specialty||!service,!data.doctor,!data.date||data.date<day(),!data.time||bookedSlots.includes(data.time),!data.reason.trim()][step]){setError('Complete este paso con información válida.');return;}setStep(s=>Math.min(s+1,6));};
+  const availability=useDoctorSlots(selectedDoctor?.id,data.date,duration/60000,panel.appointments,selectedPatient?.id);
+  const timeSlots=availability.slots.map(s=>s.time);
+  const bookedSlots=availability.slots.filter(s=>!s.available).map(s=>s.time);
+  const next = () => {setError('');if([!data.patient,!data.specialty||!service,!data.doctor,!data.date||data.date<day(),!availability.slots.some(s=>s.time===data.time&&s.available),!data.reason.trim()][step]){setError('Complete este paso con información válida y un horario disponible.');return;}setStep(s=>Math.min(s+1,6));};
   const prev = () => setStep(s => Math.max(s - 1, 0));
-  const confirm = async () => {if(!selectedDoctor||!selectedPatient||!service)return;try{const start=new Date(data.date+'T'+data.time);await mutate('/citas',{pacienteId:selectedPatient.id,medicoId:selectedDoctor.id,servicioId:Number(service),inicio:start.toISOString(),fin:new Date(start.valueOf()+duration).toISOString(),motivo:data.reason});setDone(true);}catch{}}
+  const confirm = async () => {if(!selectedDoctor||!selectedPatient||!service||!availability.slots.some(s=>s.time===data.time&&s.available)){setError('Seleccione un horario disponible.');return;}try{const start=clinicStart(data.date,data.time);await mutate('/citas',{pacienteId:selectedPatient.id,medicoId:selectedDoctor.id,servicioId:Number(service),inicio:start.toISOString(),fin:new Date(start.valueOf()+duration).toISOString(),motivo:data.reason});setDone(true);}catch{}}
 
   if (done) {
     return (
@@ -184,6 +183,7 @@ export default function BookAppointment() {
         {step === 3 && (
           <div>
             <h2 className="text-base font-semibold text-slate-900 mb-4" style={{ fontFamily: 'DM Sans, sans-serif' }}>Seleccionar fecha</h2>
+            {selectedDoctor&&<p className="text-sm text-blue-700 mb-3">Jornada de {selectedDoctor.nombre}: {(selectedDoctor.horarios as Row[]||[]).map(h=>`${['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'][h.diaSemana]} ${String(h.desde).slice(0,5)}–${String(h.hasta).slice(0,5)}`).join(' · ')||'Sin horarios configurados'}</p>}
             <input
               type="date"
               className="input-field"
@@ -198,6 +198,11 @@ export default function BookAppointment() {
         {step === 4 && (
           <div>
             <h2 className="text-base font-semibold text-slate-900 mb-4" style={{ fontFamily: 'DM Sans, sans-serif' }}>Seleccionar horario disponible</h2>
+            <p className="text-sm text-blue-700 mb-3">{selectedDoctor?.nombre} · {data.date} · Hora de El Salvador · Duración: {duration/60000} minutos</p>
+            {availability.ranges.map((h,i)=><p key={i} className="text-sm text-slate-600 mb-2">Jornada: {h.desde.slice(0,5)} a {h.hasta.slice(0,5)}</p>)}
+            {availability.loading&&<p role="status" className="text-sm text-slate-500">Consultando horarios…</p>}
+            {availability.error&&<p role="alert" className="text-red-700 text-sm">{availability.error} <button className="underline" onClick={availability.retry}>Reintentar</button></p>}
+            {!availability.loading&&!availability.error&&!timeSlots.length&&<p className="text-sm text-orange-700">El médico no tiene jornada disponible para esta fecha y duración. Seleccione otro día o médico.</p>}
             <div className="grid grid-cols-4 gap-2">
               {timeSlots.map(t => {
                 const isBooked = bookedSlots.includes(t);
@@ -217,7 +222,7 @@ export default function BookAppointment() {
                 );
               })}
             </div>
-            <p className="text-xs text-slate-400 mt-3">Los horarios tachados ya están ocupados.</p>
+            <p className="text-xs text-slate-400 mt-3">Los horarios tachados no están disponibles por citas, bloqueos o porque ya pasaron.</p>
           </div>
         )}
 

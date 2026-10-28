@@ -38,3 +38,10 @@ Check(!Helpers.CanManageAppointment("Paciente",7,7),"Paciente no hereda permisos
 Check(!Helpers.CanReschedule("En consulta",rescheduleNow.AddDays(-1),"Medico",rescheduleNow),"No reprogramar consulta iniciada");
 Check(!Helpers.CanReschedule("Finalizada",rescheduleNow.AddDays(-1),"Medico",rescheduleNow),"No reprogramar consulta finalizada");
 Console.WriteLine($"OK: {count} comprobaciones, incluido aislamiento de citas por médico.");
+var schedules=new[]{new ScheduleInput(4,new TimeOnly(9,15),new TimeOnly(11,15)),new ScheduleInput(4,new TimeOnly(16,0),new TimeOnly(19,0))};
+Check(ScheduleRules.Fits(new DateTime(2026,10,29,15,15,0,DateTimeKind.Utc),new DateTime(2026,10,29,15,45,0,DateTimeKind.Utc),schedules),"Inicio exacto jornada del médico");
+Check(!ScheduleRules.Fits(new DateTime(2026,10,29,15,0,0,DateTimeKind.Utc),new DateTime(2026,10,29,15,30,0,DateTimeKind.Utc),schedules),"No antes de jornada");
+Check(!ScheduleRules.Fits(new DateTime(2026,10,29,17,0,0,DateTimeKind.Utc),new DateTime(2026,10,29,17,30,0,DateTimeKind.Utc),schedules),"No terminar después de jornada");
+Check(ScheduleRules.Fits(new DateTime(2026,10,30,0,30,0,DateTimeKind.Utc),new DateTime(2026,10,30,1,0,0,DateTimeKind.Utc),schedules),"Jornada tarde usando fecha local");
+Check(!ScheduleRules.Fits(new DateTime(2026,10,29,15,15,0,DateTimeKind.Utc),new DateTime(2026,10,29,15,45,0,DateTimeKind.Utc),Array.Empty<ScheduleInput>()),"Sin jornada no hay disponibilidad");
+Console.WriteLine($"OK: {count} comprobaciones, incluidas jornadas y duración de atención.");

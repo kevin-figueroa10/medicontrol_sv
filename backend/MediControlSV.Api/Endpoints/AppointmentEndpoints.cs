@@ -47,7 +47,7 @@ public static class AppointmentEndpoints {
    await using var tx=await db.Database.BeginTransactionAsync(IsolationLevel.Serializable);
 
    if(!await AgendaRules.Allowed(db,v.MedicoId,v.Inicio,v.Fin))return Helpers.Bad("La cita queda fuera del horario del médico.");
-   if(await db.Citas.AnyAsync(x=>x.MedicoId==v.MedicoId&&x.Estado!="Cancelada"&&x.Inicio<v.Fin&&v.Inicio<x.Fin))return Results.Conflict(new{error="El médico ya tiene una cita en ese horario."});
+   if(await db.Citas.AnyAsync(x=>x.MedicoId==v.MedicoId&&x.Estado!="Cancelada"&&x.Estado!="No asistió"&&x.Inicio<v.Fin&&v.Inicio<x.Fin))return Results.Conflict(new{error="El médico ya tiene una cita en ese horario."});
 
    if(await db.Citas.AnyAsync(x=>x.PacienteId==v.PacienteId&&x.Estado!="Cancelada"&&x.Estado!="No asistió"&&x.Inicio<v.Fin&&v.Inicio<x.Fin))return Results.Conflict(new{error="El paciente ya tiene una cita en ese horario."});
 
@@ -65,14 +65,19 @@ public static class AppointmentEndpoints {
    if(Helpers.Role(user)!="Paciente"&&!Helpers.CanManageAppointment(Helpers.Role(user),Helpers.UserId(user),c.Medico?.UsuarioId))return Results.Forbid();
    if(!Helpers.CanReschedule(c.Estado,c.Inicio,Helpers.Role(user),DateTime.UtcNow))return Helpers.Bad("Solo se reprograman citas confirmadas, citas sin atender de días anteriores y ausencias, según sus permisos.");
    if(await db.Consultas.AnyAsync(x=>x.CitaId==id))return Helpers.Bad("La cita ya tiene una consulta registrada y no puede reprogramarse.");
+   var targetDoctorId=v.MedicoId??c.MedicoId;
+   if(!await db.Medicos.AnyAsync(x=>x.Id==targetDoctorId&&x.Activo&&x.Usuario!=null&&x.Usuario.Activo))return Helpers.Bad("Seleccione un médico activo con cuenta habilitada.");
    var config=await db.ConfiguracionesConsultorio.AsNoTracking().FirstOrDefaultAsync();if(start>DateTime.UtcNow.AddDays(config?.AnticipoDias??60))return Helpers.Bad("Anticipo fuera del límite.");if(Helpers.Role(user)=="Paciente"&&(c.Paciente!.UsuarioId!=Helpers.UserId(user)||c.Inicio<DateTime.UtcNow.AddHours(config?.CancelacionHoras??24)))return Results.Forbid();
 
-   if(!await AgendaRules.Allowed(db,c.MedicoId,start,end))return Helpers.Bad("Horario fuera de la jornada del médico.");
-   if(await db.Citas.AnyAsync(x=>x.Id!=id&&x.Estado!="Cancelada"&&x.Estado!="No asistió"&&(x.MedicoId==c.MedicoId||x.PacienteId==c.PacienteId)&&x.Inicio<end&&x.Fin>start)||await db.BloqueosAgenda.AnyAsync(x=>x.MedicoId==c.MedicoId&&x.Inicio<end&&x.Fin>start))return Results.Conflict(new{error="El horario ya está ocupado o bloqueado."});
+   if(!await AgendaRules.Allowed(db,targetDoctorId,start,end))return Helpers.Bad("Horario fuera de la jornada del médico seleccionado.");
+   if(await db.Citas.AnyAsync(x=>x.Id!=id&&x.Estado!="Cancelada"&&x.Estado!="No asistió"&&(x.MedicoId==targetDoctorId||x.PacienteId==c.PacienteId)&&x.Inicio<end&&x.Fin>start)||await db.BloqueosAgenda.AnyAsync(x=>x.MedicoId==targetDoctorId&&x.Inicio<end&&x.Fin>start))return Results.Conflict(new{error="El horario ya está ocupado o bloqueado."});
 
-   var previous=c.Estado;var previousStart=c.Inicio;var previousEnd=c.Fin;c.Inicio=start;c.Fin=end;c.Estado="Confirmada";
+   var previous=c.Estado;var previousStart=c.Inicio;var previousEnd=c.Fin;var previousDoctorId=c.MedicoId;c.Inicio=start;c.Fin=end;c.Estado="Confirmada";c.MedicoId=targetDoctorId;
    db.HistorialCitas.Add(new HistorialCita{CitaId=id,UsuarioId=Helpers.UserId(user),EstadoAnterior=previous,EstadoNuevo="Confirmada",Motivo=v.Motivo});
-   db.Auditorias.Add(new Auditoria{UsuarioId=Helpers.UserId(user),Accion="REPROGRAMAR",Entidad="Cita",EntidadId=id,Descripcion=$"{previousStart:O} / {previousEnd:O} → {start:O} / {end:O}"});
+   db.Auditorias.Add(new Auditoria{UsuarioId=Helpers.UserId(user),Accion="REPROGRAMAR",Entidad="Cita",EntidadId=id,Descripcion=$"Médico {previousDoctorId} → {targetDoctorId}; {previousStart:O} / {previousEnd:O} → {start:O} / {end:O}"});
+   var recipients=await db.Medicos.Where(x=>(x.Id==previousDoctorId||x.Id==targetDoctorId)&&x.UsuarioId!=null).Select(x=>x.UsuarioId!.Value).ToListAsync();
+   if(c.Paciente?.UsuarioId is int patientUserId)recipients.Add(patientUserId);
+   foreach(var recipient in recipients.Distinct())db.Notificaciones.Add(new Notificacion{UsuarioId=recipient,CitaId=id,Titulo="Cita reprogramada",Mensaje=$"La cita #{id} se reprogramó para {TimeZoneInfo.ConvertTimeFromUtc(start,AgendaRules.Zone):dd/MM/yyyy HH:mm}. Revise la agenda actualizada."});
    await db.SaveChangesAsync();await tx.CommitAsync();return Results.NoContent();
 
   }).RequireAuthorization(p=>p.RequireRole("Administrador","Recepcionista","Medico","Paciente"));

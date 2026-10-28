@@ -1,6 +1,5 @@
-import {useEffect} from 'react';
-import {useClinic,date,day,Row} from '../../context/Clinic';
-import {api} from '../../lib/api';
+import {RescheduleModal} from '../../components/UnattendedAppointments';
+import {useClinic} from '../../context/Clinic';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Calendar, Clock, User, X, RefreshCw, Check, CheckCircle, ChevronRight } from 'lucide-react';
@@ -14,22 +13,17 @@ const statusBadge: Record<string, string> = {
   'No asistió': 'bg-orange-100 text-orange-700',
 };
 
-const timeSlots = ['08:00', '08:30', '09:00', '09:30', '10:00', '10:30', '11:00', '11:30', '14:00', '14:30', '15:00', '15:30'];
 
 
 export default function PatientAppointments() {
   const navigate = useNavigate();
   const {panel,mutate,busy}=useClinic();const [error,setError]=useState('');
   const appts=panel.appointments.map(a=>({id:a.id,doctor:String(a.medico),specialty:String(a.especialidad),date:new Date(a.inicio).toLocaleDateString('es-SV',{day:'2-digit',month:'short',year:'numeric'}),time:new Date(a.inicio).toLocaleTimeString('es-SV',{hour:'2-digit',minute:'2-digit'}),status:String(a.estado),group:a.estado==='Cancelada'?'cancelled':new Date(a.inicio)>new Date()&&!['Finalizada','No asistió'].includes(a.estado)?'upcoming':'past'}));
-  const [availability,setAvailability]=useState<{ocupados:Row[];bloqueados:Row[];horarios:Row[]}|null>(null);
 
   const [tab, setTab] = useState<'upcoming' | 'past' | 'cancelled'>('upcoming');
   const [cancelId, setCancelId] = useState<number | null>(null);
   const [cancelDone, setCancelDone] = useState(false);
   const [rescheduleId, setRescheduleId] = useState<number | null>(null);
-  const [newDate, setNewDate] = useState('');
-  const [newTime, setNewTime] = useState('');
-  const [rescheduleDone, setRescheduleDone] = useState(false);
 
   const filtered = appts.filter(a => a.group === tab);
 
@@ -37,10 +31,7 @@ export default function PatientAppointments() {
   const closeCancel = () => { setCancelId(null); setCancelDone(false); };
 
   const current=panel.appointments.find(a=>a.id===rescheduleId);
-  useEffect(()=>{setAvailability(null);if(!current||!newDate)return;api<{ocupados:Row[];bloqueados:Row[];horarios:Row[]}>(`/medicos/${current.medicoId}/disponibilidad?fecha=${newDate}`).then(setAvailability).catch(()=>setError('No se pudo consultar la disponibilidad.'));},[current?.id,newDate]);
-  const bookedSlots=timeSlots.filter(t=>{const d=new Date(newDate+'T'+t),end=new Date(d.valueOf()+(current?new Date(current.fin).valueOf()-new Date(current.inicio).valueOf():1800000));return !availability||(availability.horarios.length>0&&!availability.horarios.some(h=>h.diaSemana===d.getDay()&&t>=String(h.desde).slice(0,5)&&new Date(end).toTimeString().slice(0,5)<=String(h.hasta).slice(0,5)))||d<new Date()||[...availability.ocupados,...availability.bloqueados].some(a=>new Date(a.inicio)<end&&new Date(a.fin)>d);});
-  const confirmReschedule=async()=>{setError('');if(!current||!newDate||!newTime)return;try{const start=new Date(newDate+'T'+newTime),duration=new Date(current.fin).valueOf()-new Date(current.inicio).valueOf();await mutate(`/citas/${current.id}/horario`,{inicio:start.toISOString(),fin:new Date(start.valueOf()+duration).toISOString(),motivo:'Reprogramación solicitada por el paciente'},'PUT');setRescheduleDone(true);}catch(ex){setError(ex instanceof Error?ex.message:'No se pudo reprogramar.');}};
-  const closeReschedule = () => { setRescheduleId(null); setNewDate(''); setNewTime(''); setRescheduleDone(false); };
+  const closeReschedule = () => setRescheduleId(null);
 
   return (
     <div className="p-6 max-w-screen-md">
@@ -145,55 +136,7 @@ export default function PatientAppointments() {
         </div>
       )}
 
-      {/* Reschedule modal */}
-      {rescheduleId !== null && (
-        <div className="modal-overlay" onClick={closeReschedule}>
-          <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl" onClick={e => e.stopPropagation()}>
-            {!rescheduleDone ? (
-              <>
-                <div className="flex items-center justify-between mb-5">
-                  <h2 className="text-lg font-bold text-slate-900" style={{ fontFamily: 'DM Sans, sans-serif' }}>Reprogramar cita</h2>
-                  <button onClick={closeReschedule}><X size={18} className="text-slate-400" /></button>
-                </div>
-                <div className="space-y-4">{error&&<p role="alert" className="text-red-700 text-sm">{error}</p>}
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1.5">Nueva fecha</label>
-                    <input type="date" className="input-field" min={day()} value={newDate} onChange={e => setNewDate(e.target.value)} />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1.5">Nuevo horario</label>
-                    <div className="grid grid-cols-4 gap-2">
-                      {timeSlots.map(t => {
-                        const booked = bookedSlots.includes(t);
-                        return (
-                          <button key={t} disabled={booked}
-                            className={`py-2 rounded-lg text-xs font-medium border transition-all ${booked ? 'bg-slate-50 text-slate-300 border-slate-100 cursor-not-allowed line-through' : newTime === t ? 'bg-blue-600 text-white border-blue-600' : 'border-slate-200 text-slate-700 hover:border-blue-300'}`}
-                            onClick={() => !booked && setNewTime(t)}>
-                            {t}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </div>
-                {error&&<p role="alert" className="text-red-700 text-sm">{error}</p>}<div className="flex gap-3 mt-5">
-                  <button className="btn btn-secondary flex-1" onClick={closeReschedule}>Cancelar</button>
-                  <button className="btn btn-primary flex-1" onClick={confirmReschedule} disabled={busy||!newDate||!newTime||bookedSlots.includes(newTime)}>
-                    <Check size={13} /> Confirmar
-                  </button>
-                </div>
-              </>
-            ) : (
-              <div className="text-center py-4">
-                <CheckCircle size={36} className="text-green-500 mx-auto mb-3" />
-                <h2 className="text-base font-bold text-slate-900 mb-1" style={{ fontFamily: 'DM Sans, sans-serif' }}>Cita reprogramada</h2>
-                <p className="text-sm text-slate-500 mb-4">Tu cita fue actualizada correctamente.</p>
-                <button className="btn btn-primary w-full justify-center" onClick={closeReschedule}>Aceptar</button>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+      {current&&<RescheduleModal appointment={current} onClose={closeReschedule}/>}
     </div>
   );
 }
