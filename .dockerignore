@@ -9,3 +9,6 @@
 .checks
 .runtime
 reference
+.archivo-local
+output
+tmp

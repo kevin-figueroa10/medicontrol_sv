@@ -5,8 +5,7 @@ public static class DbInitializer {
  public static async Task Initialize(AppDbContext db,IConfiguration config,IHostEnvironment env){
   if(!env.IsDevelopment() || !config.GetValue<bool>("Database:InitializeDevelopment"))return;
   await db.Database.EnsureCreatedAsync();
-  await db.Database.ExecuteSqlRawAsync(await File.ReadAllTextAsync(Path.Combine(AppContext.BaseDirectory,"SchemaUpgrade.sql")));
-  await db.Database.ExecuteSqlRawAsync(await File.ReadAllTextAsync(Path.Combine(AppContext.BaseDirectory,"SchemaLaboratorio.sql")));
+  await db.Database.ExecuteSqlRawAsync(await File.ReadAllTextAsync(Path.Combine(AppContext.BaseDirectory,"MediControlSV.sql")));
   foreach(var role in new[]{"Administrador","Recepcionista","Medico","Paciente","Laboratorio"})if(!await db.Roles.AnyAsync(x=>x.Nombre==role))db.Roles.Add(new Rol{Nombre=role});
   await db.SaveChangesAsync();
   if(!await db.Servicios.AnyAsync()) {db.Servicios.AddRange(new Servicio{Nombre="Consulta general",Precio=25m},new Servicio{Nombre="Control médico",Precio=20m});await db.SaveChangesAsync();}

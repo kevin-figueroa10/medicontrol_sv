@@ -1,6 +1,7 @@
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 COPY backend/MediControlSV.Api/MediControlSV.Api.csproj backend/MediControlSV.Api/
+COPY database/MediControlSV.sql database/MediControlSV.sql
 RUN dotnet restore backend/MediControlSV.Api/MediControlSV.Api.csproj
 COPY backend/MediControlSV.Api/ backend/MediControlSV.Api/
 RUN dotnet publish backend/MediControlSV.Api/MediControlSV.Api.csproj -c Release -o /app/publish --no-restore /p:UseAppHost=false

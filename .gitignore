@@ -3,6 +3,9 @@
 **/App_Data/
 .checks/
 .runtime/
+.archivo-local/
+output/
+tmp/
 
 # Dependencies and generated builds
 **/node_modules/
