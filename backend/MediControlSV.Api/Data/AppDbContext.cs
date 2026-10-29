@@ -31,6 +31,11 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
   b.Entity<Cita>().ToTable(t=>t.HasCheckConstraint("CK_Citas_Rango", "[Fin] > [Inicio]"));
   b.Entity<Pago>().ToTable(t=>t.HasCheckConstraint("CK_Pagos_Monto", "[Monto] > 0"));
   b.Entity<Servicio>().ToTable(t=>t.HasCheckConstraint("CK_Servicios_Precio", "[Precio] >= 0"));
+  // SQL Server disallows OUTPUT without INTO on tables that have enabled triggers.
+  b.Entity<Usuario>().ToTable(t=>t.UseSqlOutputClause(false));
+  b.Entity<Servicio>().ToTable(t=>t.UseSqlOutputClause(false));
+  b.Entity<Pago>().ToTable(t=>t.UseSqlOutputClause(false));
+  b.Entity<Paciente>().ToTable(t=>t.UseSqlOutputClause(false));
   foreach(var fk in b.Model.GetEntityTypes().SelectMany(e=>e.GetForeignKeys())) fk.DeleteBehavior=DeleteBehavior.Restrict;
  }
 }
